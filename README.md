@@ -69,7 +69,7 @@ apex-steering/
 ├── packages/
 │   └── main-steering/         Node.js — control plane server
 ├── e2e/                       Cross-system E2E test suite
-│   ├── src/tests/             10 test suites (123+ tests)
+│   ├── src/tests/             10 test suites (155 tests)
 │   ├── src/sandbox/           Manual testing sandbox server
 │   └── fixtures/              Sample HLS/DASH manifests
 ├── ui/                        Sandbox dashboard (HTML)
@@ -107,7 +107,7 @@ npm run dev
 | `npm run build:main` | Build main-steering TypeScript only |
 | `npm test` | Run main-steering unit tests + E2E tests |
 | `npm run test:main` | Run main-steering unit tests (206 tests) |
-| `npm run test:e2e` | Run cross-system E2E tests (123+ tests) |
+| `npm run test:e2e` | Run cross-system E2E tests (155 tests) |
 | `npm run dev` | Start main-steering + edge-steering + sandbox |
 | `npm run sandbox` | Start sandbox dashboard only |
 
@@ -152,15 +152,15 @@ Cross-system E2E test suite validating the full pipeline across all three compon
 | Suite | Tests | Coverage |
 |-------|-------|----------|
 | wire-compat | 16 | Encoding identity between WASM modules |
-| hls-session | 22 | Full HLS session lifecycle |
-| dash-session | 18 | Full DASH session lifecycle |
-| contracts | 9 | Contract-driven priority verification |
-| multi-region | 10 | Region-scoped fleet commands |
-| concurrent | 8 | Session isolation under concurrency |
+| hls-session | 34 | Full HLS session lifecycle |
+| dash-session | 25 | Full DASH session lifecycle |
+| contracts | 10 | Contract-driven priority verification |
+| multi-region | 12 | Region-scoped fleet commands |
+| concurrent | 10 | Session isolation under concurrency |
 | tokens | 10 | CDN auth token passthrough |
-| errors | 9 | Graceful degradation with corrupt input |
-| overrides | 14 | Master override propagation lifecycle |
-| disaster | 9 | CDN disaster recovery scenarios |
+| errors | 10 | Graceful degradation with corrupt input |
+| overrides | 16 | Master override propagation lifecycle |
+| disaster | 12 | CDN disaster recovery scenarios |
 
 ### Sandbox Dashboard
 

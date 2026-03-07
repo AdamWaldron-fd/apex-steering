@@ -89,11 +89,16 @@ current) are rejected by edge-steering.
 ## Conventions
 
 - Tests use `beforeEach` to reset edge state and clear main overrides
-- E2E tests run sequentially (shared server state)
+- E2E test files run sequentially (`fileParallelism: false` in vitest config) — shared server state
+- Within each E2E file, tests also run sequentially (`sequence.concurrent: false`)
+- E2E `beforeEach` should reset edge AFTER clearing main (otherwise main.clear propagates a high generation to edge, making subsequent low-generation direct commands stale)
+- Main-steering's generation counter accumulates across E2E test suites (never resets without server restart)
 - Main-steering tests are fully isolated (no shared state)
 - Rust tests are fully isolated (pure functions, no shared state)
 - WASM builds use `opt-level = "s"` + LTO for size optimization
 - All base64 encoding is URL-safe with no padding (`base64::URL_SAFE_NO_PAD`)
+- Edge-steering gracefully handles invalid `_ss` (falls back to stored initial state instead of erroring)
+- Manifest-updater returns empty string for empty input, returns input unchanged for unknown format
 
 ## Ports
 
