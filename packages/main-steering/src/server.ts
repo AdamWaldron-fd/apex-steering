@@ -19,7 +19,7 @@ const defaultProviders: CdnProvider[] = [
     name: "CDN Alpha",
     base_url: "https://cdn-a.example.com",
     regions: ["us-east", "us-west"],
-    pricing: { cost_per_gb: 0.08, burst_cost_per_gb: 0.12, currency: "USD" },
+    pricing: { cost_per_gb: 0.04, burst_cost_per_gb: 0.08, currency: "USD" },
     weight: 0.6,
     enabled: true,
   },

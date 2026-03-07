@@ -207,7 +207,7 @@ export const edge = {
 
 /** Extract the _ss= value from a steered manifest's SERVER-URI or ContentSteering URL. */
 export function extractSsFromManifest(manifest: string): string {
-  const match = manifest.match(/_ss=([^"&\s]+)/);
+  const match = manifest.match(/_ss=([^"&\s<]+)/);
   if (!match) throw new Error("No _ss= parameter found in manifest");
   return match[1];
 }

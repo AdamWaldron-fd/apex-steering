@@ -18,14 +18,15 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub fn update_manifest(manifest: &str, request_json: &str) -> Result<String, JsValue> {
     let trimmed = manifest.trim_start();
-    if trimmed.starts_with("#EXTM3U") {
+    if trimmed.is_empty() {
+        Ok(String::new())
+    } else if trimmed.starts_with("#EXTM3U") {
         update_hls(manifest, request_json)
     } else if trimmed.contains("<MPD") {
         update_dash(manifest, request_json)
     } else {
-        Err(JsValue::from_str(
-            "Unknown manifest format: expected HLS (#EXTM3U) or DASH (<MPD>)",
-        ))
+        // Unknown format: return unchanged
+        Ok(manifest.to_string())
     }
 }
 

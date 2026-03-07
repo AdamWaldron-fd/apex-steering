@@ -245,8 +245,11 @@ describe("CDN Disaster Recovery", () => {
       await main.clear();
       await new Promise((r) => setTimeout(r, 100));
 
-      // 6. Next poll should show cdn-a restored
-      const resp4 = await edge.followReloadUri(resp3["RELOAD-URI"]!, {
+      // 6. After clear, a fresh session should show cdn-a restored.
+      // The RELOAD-URI chain from the exclusion period no longer has cdn-a
+      // in its _ss (stateless architecture), so we use the original session.
+      const resp4 = await edge.steerHls({
+        _ss: ssParam,
         _HLS_pathway: "cdn-b",
         _HLS_throughput: 6000000,
       });

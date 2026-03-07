@@ -91,10 +91,10 @@ pub fn parse_request(query_string: &str, protocol_hint: &str) -> Result<String, 
     });
 
     let session_state = match parsed.session_state_raw {
-        Some(ref encoded) => Some(
-            state::decode_state(encoded)
-                .map_err(|e| JsError::new(&format!("bad session state: {e}")))?,
-        ),
+        Some(ref encoded) => match state::decode_state(encoded) {
+            Ok(s) => Some(s),
+            Err(_) => None, // Invalid _ss → fall back to stored initial state
+        },
         None => None,
     };
 

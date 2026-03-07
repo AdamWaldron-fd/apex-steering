@@ -43,10 +43,13 @@ describe("Master Override Propagation", () => {
       expect(resp["PATHWAY-PRIORITY"]?.[1]).toBe("cdn-b");
     });
 
-    it("initial override_gen is 0", async () => {
+    it("initial override_gen matches server generation", async () => {
       ssParam = await initSession();
       const decoded = decodeSs(ssParam);
-      expect(decoded.override_gen).toBe(0);
+      // In a shared E2E server, the generation accumulates across test suites.
+      // The session's override_gen should match the server's current generation.
+      const status = await main.status() as { generation: number };
+      expect(decoded.override_gen).toBe(status.generation);
     });
   });
 

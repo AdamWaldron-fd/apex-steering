@@ -17,7 +17,13 @@ cd "$ROOT/e2e"
 npx tsx src/sandbox/server.ts &
 SANDBOX_PID=$!
 
-trap "kill $MAIN_PID $EDGE_PID $SANDBOX_PID 2>/dev/null" EXIT
+cleanup() {
+  kill $MAIN_PID $EDGE_PID $SANDBOX_PID 2>/dev/null
+  # Wait briefly then force-kill any stragglers
+  sleep 1
+  kill -9 $MAIN_PID $EDGE_PID $SANDBOX_PID 2>/dev/null
+}
+trap cleanup EXIT
 
 echo ""
 echo "  Main steering:  http://localhost:4444"

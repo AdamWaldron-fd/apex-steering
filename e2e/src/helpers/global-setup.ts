@@ -74,6 +74,19 @@ export async function setup(): Promise<void> {
 }
 
 export async function teardown(): Promise<void> {
-  mainProc?.kill();
-  edgeProc?.kill();
+  for (const proc of [mainProc, edgeProc]) {
+    if (!proc) continue;
+    proc.kill("SIGTERM");
+    // Force kill after 2s if still alive
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        try { proc.kill("SIGKILL"); } catch { /* already dead */ }
+        resolve();
+      }, 2000);
+      proc.on("exit", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+  }
 }

@@ -22,8 +22,8 @@ describe("Error Handling", () => {
   const STEERING_URI = `${edge.url}/steer/hls`;
 
   beforeEach(async () => {
-    await edge.reset();
     await main.clear();
+    await edge.reset();
   });
 
   // ── Helper ─────────────────────────────────────────────────────

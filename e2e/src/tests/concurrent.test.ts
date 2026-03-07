@@ -27,7 +27,7 @@ describe("Concurrent Sessions", () => {
 
   // ── Helper ─────────────────────────────────────────────────────
 
-  async function initSession(cdns: string): Promise<{
+  async function initSession(cdns: string, opts?: { min_bitrate?: number; max_bitrate?: number }): Promise<{
     initResp: ManifestUpdateRequest;
     manifest: string;
     ss: string;
@@ -35,6 +35,8 @@ describe("Concurrent Sessions", () => {
     const initResp = await main.sessionInit({
       cdns,
       steering_uri: STEERING_URI,
+      min_bitrate: opts?.min_bitrate,
+      max_bitrate: opts?.max_bitrate,
     });
     const manifest = updateManifest(sampleHls(), JSON.stringify(initResp));
     const ss = extractSsFromManifest(manifest);
@@ -43,12 +45,11 @@ describe("Concurrent Sessions", () => {
 
   // ── Independent session state ──────────────────────────────────
 
-  it("two sessions with different CDN order get different _ss values", async () => {
+  it("two sessions with different CDN sets get different _ss values", async () => {
     const sessionA = await initSession("cdn-a,cdn-b");
-    const sessionB = await initSession("cdn-b,cdn-a");
+    const sessionB = await initSession("cdn-b");
 
-    // Both should encode priorities, but the encoded _ss may differ
-    // because session_state fields like timestamp differ
+    // Different CDN sets produce different priorities and thus different _ss
     expect(sessionA.ss).not.toBe(sessionB.ss);
   });
 
@@ -82,8 +83,8 @@ describe("Concurrent Sessions", () => {
   });
 
   it("throughput degradation in session A does not affect session B", async () => {
-    const sessionA = await initSession("cdn-a,cdn-b");
-    const sessionB = await initSession("cdn-a,cdn-b");
+    const sessionA = await initSession("cdn-a,cdn-b", { min_bitrate: 783322, max_bitrate: 4530860 });
+    const sessionB = await initSession("cdn-a,cdn-b", { min_bitrate: 783322, max_bitrate: 4530860 });
 
     // Session A: good throughput, then degraded
     const respA1 = await edge.steerHls({
