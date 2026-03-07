@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apex Steering Sandbox</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a;
+      --text: #e1e4ed; --muted: #8b8fa3; --accent: #6c8aff;
+      --green: #3dd68c; --red: #f06e6e; --yellow: #f0c95e;
+      --radius: 8px; --font: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; padding: 24px; }
+    h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    h2 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .health { display: flex; gap: 16px; }
+    .health-dot { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.up { background: var(--green); }
+    .dot.down { background: var(--red); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+    .full { grid-column: 1 / -1; }
+    label { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+      color: var(--text); font-family: var(--font); font-size: 12px; padding: 6px 8px; margin-bottom: 8px;
+    }
+    textarea { resize: vertical; min-height: 80px; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    button {
+      background: var(--accent); color: #fff; border: none; border-radius: 4px;
+      font-family: var(--font); font-size: 12px; font-weight: 600; padding: 6px 14px;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.secondary { background: var(--border); color: var(--text); }
+    button.danger { background: var(--red); }
+    .btn-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    pre {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+      padding: 10px; font-size: 11px; overflow-x: auto; max-height: 300px; overflow-y: auto;
+      white-space: pre-wrap; word-break: break-all; color: var(--muted);
+    }
+    pre.result { color: var(--green); }
+    pre.error { color: var(--red); }
+    .tag { display: inline-block; background: var(--border); border-radius: 3px; padding: 2px 6px; font-size: 11px; margin: 2px; }
+    .inline-fields { display: flex; gap: 8px; }
+    .inline-fields > div { flex: 1; }
+    .section-sep { border-top: 1px solid var(--border); margin: 12px 0; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Apex Steering Sandbox</h1>
+    <span style="color:var(--muted)">Manual testing dashboard for content-steering</span>
+  </div>
+  <div class="health">
+    <span class="health-dot"><span class="dot" id="dot-main"></span> main-steering</span>
+    <span class="health-dot"><span class="dot" id="dot-edge"></span> edge-steering</span>
+    <button class="secondary" onclick="checkHealth()">Refresh</button>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- Session Init -->
+  <div class="card">
+    <h2>Session Init</h2>
+    <label>CDNs (comma-separated)</label>
+    <input id="init-cdns" value="cdn-a,cdn-b" />
+    <label>Steering URI</label>
+    <input id="init-uri" value="/steer/hls" />
+    <div class="inline-fields">
+      <div><label>Region</label><input id="init-region" value="us-east" /></div>
+      <div><label>Duration (s)</label><input id="init-duration" type="number" value="600" /></div>
+    </div>
+    <div class="inline-fields">
+      <div><label>Min Bitrate</label><input id="init-min-br" type="number" value="0" /></div>
+      <div><label>Max Bitrate</label><input id="init-max-br" type="number" value="10000000" /></div>
+    </div>
+    <div class="btn-row">
+      <button onclick="sessionInit()">Init Session</button>
+    </div>
+    <pre id="out-init" class="result" style="margin-top:8px"></pre>
+  </div>
+
+  <!-- Priorities -->
+  <div class="card">
+    <h2>Set Priorities</h2>
+    <label>Pathway Priority (comma-separated)</label>
+    <input id="prio-list" value="cdn-a,cdn-b" />
+    <div class="inline-fields">
+      <div><label>Region (optional)</label><input id="prio-region" value="" /></div>
+      <div><label>TTL Override (s)</label><input id="prio-ttl" type="number" value="" /></div>
+    </div>
+    <div class="btn-row">
+      <button onclick="setPriorities()">Set Priorities</button>
+    </div>
+
+    <div class="section-sep"></div>
+    <h2>Exclude Pathway</h2>
+    <div class="inline-fields">
+      <div><label>Pathway</label><input id="excl-pathway" value="cdn-b" /></div>
+      <div><label>Region (optional)</label><input id="excl-region" value="" /></div>
+    </div>
+    <div class="btn-row">
+      <button onclick="excludePathway()">Exclude</button>
+      <button class="danger" onclick="clearOverrides()">Clear All Overrides</button>
+    </div>
+    <pre id="out-prio" class="result" style="margin-top:8px"></pre>
+  </div>
+
+  <!-- Edge Steer -->
+  <div class="card">
+    <h2>Edge Steer Request</h2>
+    <label>_ss (session state, base64url)</label>
+    <textarea id="steer-ss" rows="2"></textarea>
+    <div class="inline-fields">
+      <div><label>Pathway</label><input id="steer-pathway" value="" placeholder="e.g. cdn-a" /></div>
+      <div><label>Throughput</label><input id="steer-throughput" type="number" value="" placeholder="bps" /></div>
+    </div>
+    <label>Protocol</label>
+    <select id="steer-proto">
+      <option value="hls">HLS</option>
+      <option value="dash">DASH</option>
+    </select>
+    <div class="btn-row">
+      <button onclick="edgeSteer()">Steer</button>
+    </div>
+    <pre id="out-steer" class="result" style="margin-top:8px"></pre>
+  </div>
+
+  <!-- Manifest Bridge -->
+  <div class="card">
+    <h2>Manifest Updater</h2>
+    <label>Source manifest</label>
+    <div class="btn-row" style="margin-bottom:8px;margin-top:0">
+      <button class="secondary" onclick="loadFixture('hls')">Load HLS</button>
+      <button class="secondary" onclick="loadFixture('dash')">Load DASH</button>
+    </div>
+    <textarea id="manifest-src" rows="6"></textarea>
+    <label>Request JSON (ManifestUpdateRequest)</label>
+    <textarea id="manifest-req" rows="4"></textarea>
+    <div class="btn-row">
+      <button onclick="updateManifest()">Update Manifest</button>
+    </div>
+    <pre id="out-manifest" class="result" style="margin-top:8px"></pre>
+  </div>
+
+  <!-- Status & Fleet -->
+  <div class="card">
+    <h2>System Status</h2>
+    <div class="btn-row">
+      <button onclick="getStatus()">Get Status</button>
+    </div>
+    <pre id="out-status" class="result" style="margin-top:8px"></pre>
+
+    <div class="section-sep"></div>
+    <h2>Edge Control</h2>
+    <label>Command JSON</label>
+    <textarea id="edge-cmd" rows="2">{"action":"status"}</textarea>
+    <div class="btn-row">
+      <button onclick="edgeControl()">Send</button>
+      <button class="danger" onclick="edgeReset()">Reset Edge</button>
+    </div>
+    <pre id="out-edge" class="result" style="margin-top:8px"></pre>
+  </div>
+
+  <!-- Encode State -->
+  <div class="card">
+    <h2>Encode / Decode State</h2>
+    <label>Session State JSON</label>
+    <textarea id="encode-json" rows="4">{
+  "priorities": ["cdn-a", "cdn-b"],
+  "throughput_map": [["cdn-a", 5000000], ["cdn-b", 3000000]],
+  "min_bitrate": 0,
+  "max_bitrate": 10000000,
+  "duration": 600,
+  "position": 0,
+  "timestamp": 0,
+  "override_gen": 0
+}</textarea>
+    <div class="btn-row">
+      <button onclick="encodeState()">Encode to _ss</button>
+      <button class="secondary" onclick="decodeState()">Decode _ss</button>
+    </div>
+    <pre id="out-encode" class="result" style="margin-top:8px"></pre>
+
+    <div class="section-sep"></div>
+    <label>_ss value to decode</label>
+    <input id="decode-ss" value="" placeholder="base64url _ss value" />
+  </div>
+
+  <!-- Event Log -->
+  <div class="card full">
+    <h2>Event Log</h2>
+    <div class="btn-row" style="margin-bottom:8px;margin-top:0">
+      <button class="secondary" onclick="document.getElementById('log').textContent=''">Clear</button>
+    </div>
+    <pre id="log" style="max-height:200px"></pre>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const API = '';
+
+function log(msg, isError) {
+  const el = $('log');
+  const ts = new Date().toLocaleTimeString();
+  el.textContent = `[${ts}] ${msg}\n` + el.textContent;
+}
+
+async function api(path, opts = {}) {
+  const method = opts.method || 'GET';
+  const body = opts.body;
+  log(`${method} ${path}`);
+  try {
+    const resp = await fetch(`${API}${path}`, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+    });
+    const text = await resp.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = text; }
+    if (!resp.ok) {
+      log(`Error ${resp.status}: ${text}`, true);
+      return { ok: false, status: resp.status, data };
+    }
+    return { ok: true, status: resp.status, data };
+  } catch (e) {
+    log(`Network error: ${e.message}`, true);
+    return { ok: false, status: 0, data: e.message };
+  }
+}
+
+function show(elId, result) {
+  const el = $(elId);
+  el.className = result.ok ? 'result' : 'error';
+  el.textContent = typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2);
+}
+
+async function checkHealth() {
+  const r = await api('/api/health');
+  if (r.ok) {
+    $('dot-main').className = r.data.main_steering ? 'dot up' : 'dot down';
+    $('dot-edge').className = r.data.edge_steering ? 'dot up' : 'dot down';
+    log(`Health: main=${r.data.main_steering}, edge=${r.data.edge_steering}`);
+  }
+}
+
+async function sessionInit() {
+  const qs = new URLSearchParams({
+    cdns: $('init-cdns').value,
+    steering_uri: $('init-uri').value,
+    region: $('init-region').value,
+    min_bitrate: $('init-min-br').value,
+    max_bitrate: $('init-max-br').value,
+    duration: $('init-duration').value,
+  });
+  const r = await api(`/api/session/init?${qs}`);
+  show('out-init', r);
+  if (r.ok && r.data.session_state) {
+    // Auto-fill the manifest request JSON
+    $('manifest-req').value = JSON.stringify(r.data, null, 2);
+    $('encode-json').value = JSON.stringify(r.data.session_state, null, 2);
+  }
+}
+
+async function setPriorities() {
+  const body = {
+    priorities: $('prio-list').value.split(',').map(s => s.trim()).filter(Boolean),
+  };
+  const region = $('prio-region').value.trim();
+  if (region) body.region = region;
+  const ttl = parseInt($('prio-ttl').value);
+  if (!isNaN(ttl)) body.ttl_override = ttl;
+  const r = await api('/api/priorities', { method: 'POST', body });
+  show('out-prio', r);
+}
+
+async function excludePathway() {
+  const body = { pathway: $('excl-pathway').value.trim() };
+  const region = $('excl-region').value.trim();
+  if (region) body.region = region;
+  const r = await api('/api/exclude', { method: 'POST', body });
+  show('out-prio', r);
+}
+
+async function clearOverrides() {
+  const r = await api('/api/clear', { method: 'POST', body: {} });
+  show('out-prio', r);
+}
+
+async function edgeSteer() {
+  const proto = $('steer-proto').value;
+  const qs = new URLSearchParams();
+  const ss = $('steer-ss').value.trim();
+  if (ss) qs.set('_ss', ss);
+  const pw = $('steer-pathway').value.trim();
+  const tp = $('steer-throughput').value.trim();
+  if (proto === 'hls') {
+    if (pw) qs.set('_HLS_pathway', pw);
+    if (tp) qs.set('_HLS_throughput', tp);
+  } else {
+    if (pw) qs.set('_DASH_pathway', pw);
+    if (tp) qs.set('_DASH_throughput', tp);
+  }
+  const r = await api(`/api/steer?${qs}`);
+  show('out-steer', r);
+}
+
+async function loadFixture(type) {
+  const path = type === 'hls' ? '/fixtures/sample-hls.m3u8' : '/fixtures/sample-dash.mpd';
+  const r = await api(path);
+  if (r.ok) $('manifest-src').value = typeof r.data === 'string' ? r.data : JSON.stringify(r.data);
+}
+
+async function updateManifest() {
+  const body = {
+    manifest: $('manifest-src').value,
+    request_json: $('manifest-req').value,
+  };
+  const r = await api('/api/manifest', { method: 'POST', body });
+  show('out-manifest', r);
+}
+
+async function getStatus() {
+  const r = await api('/api/status');
+  show('out-status', r);
+}
+
+async function edgeControl() {
+  let cmd;
+  try { cmd = JSON.parse($('edge-cmd').value); } catch { cmd = $('edge-cmd').value; }
+  const r = await api('/api/edge/control', { method: 'POST', body: cmd });
+  show('out-edge', r);
+}
+
+async function edgeReset() {
+  const r = await api('/api/edge/reset', { method: 'POST', body: {} });
+  show('out-edge', r);
+}
+
+async function encodeState() {
+  const r = await api('/api/encode-state', { method: 'POST', body: $('encode-json').value });
+  show('out-encode', r);
+  if (r.ok && r.data.encoded) {
+    $('steer-ss').value = r.data.encoded;
+    $('decode-ss').value = r.data.encoded;
+  }
+}
+
+function decodeState() {
+  const ss = $('decode-ss').value.trim();
+  if (!ss) return;
+  try {
+    const padded = ss + '='.repeat((4 - (ss.length % 4)) % 4);
+    const decoded = JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')));
+    $('out-encode').className = 'result';
+    $('out-encode').textContent = JSON.stringify(decoded, null, 2);
+    $('encode-json').value = JSON.stringify(decoded, null, 2);
+  } catch (e) {
+    $('out-encode').className = 'error';
+    $('out-encode').textContent = `Decode error: ${e.message}`;
+  }
+}
+
+// Auto-check health on load
+checkHealth();
+</script>
+</body>
+</html>

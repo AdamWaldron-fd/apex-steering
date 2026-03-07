@@ -1,0 +1,18 @@
+[
+  {
+    "id": "cdn-a",
+    "name": "CDN Alpha",
+    "base_url": "https://cdn-a.example.com",
+    "regions": ["us-east", "us-west", "eu-west"],
+    "cost_per_gb": 0.02,
+    "weight": 60
+  },
+  {
+    "id": "cdn-b",
+    "name": "CDN Beta",
+    "base_url": "https://cdn-b.example.com",
+    "regions": ["us-east", "eu-west"],
+    "cost_per_gb": 0.03,
+    "weight": 40
+  }
+]

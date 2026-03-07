@@ -1,0 +1,6 @@
+node_modules/
+dist/
+pkg/
+pkg-node/
+target/
+*.js.map

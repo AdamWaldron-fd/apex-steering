@@ -1,0 +1,26 @@
+{
+  "name": "apex-steering",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/main-steering",
+    "e2e"
+  ],
+  "scripts": {
+    "bootstrap": "./scripts/bootstrap.sh",
+    "build:wasm": "./scripts/build-wasm.sh",
+    "build:main": "npm run build -w packages/main-steering",
+    "build": "npm run build:wasm && npm run build:main",
+    "test:main": "npm test -w packages/main-steering",
+    "test:e2e": "npm test -w e2e",
+    "test": "npm run test:main && npm run test:e2e",
+    "dev": "./scripts/dev.sh",
+    "sandbox": "npx tsx e2e/src/sandbox/server.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.7",
+    "tsx": "^4.0",
+    "vitest": "^3.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@apex-steering/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-vm-modules ../node_modules/.bin/vitest run",
+    "test:watch": "node --experimental-vm-modules ../node_modules/.bin/vitest",
+    "test:wire": "node --experimental-vm-modules ../node_modules/.bin/vitest run wire-compat",
+    "test:hls": "node --experimental-vm-modules ../node_modules/.bin/vitest run hls-session",
+    "test:dash": "node --experimental-vm-modules ../node_modules/.bin/vitest run dash-session",
+    "test:overrides": "node --experimental-vm-modules ../node_modules/.bin/vitest run overrides",
+    "test:disaster": "node --experimental-vm-modules ../node_modules/.bin/vitest run disaster",
+    "sandbox": "npx tsx src/sandbox/server.ts"
+  }
+}

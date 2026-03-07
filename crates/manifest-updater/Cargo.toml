@@ -1,0 +1,21 @@
+[package]
+name = "apex-manifest-updater"
+version = "0.1.0"
+edition = "2021"
+description = "Content steering tag injector for HLS/DASH manifests — WASM module for CDN edge deployment"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+base64.workspace = true
+regex = "1"
+serde.workspace = true
+serde_json.workspace = true
+wasm-bindgen.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

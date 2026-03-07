@@ -1,0 +1,20 @@
+{
+  "name": "@apex-steering/main",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
+    "test": "node --experimental-vm-modules ../../node_modules/.bin/vitest run",
+    "test:watch": "node --experimental-vm-modules ../../node_modules/.bin/vitest"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.0",
+    "hono": "^4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0"
+  }
+}
