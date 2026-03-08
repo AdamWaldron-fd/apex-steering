@@ -46,7 +46,7 @@ Every command is pushed in real-time to all registered edge fleet members via `P
 
 2. **Manifest transformation** — Origin passes the `ManifestUpdateRequest` and the raw HLS/DASH manifest through the manifest-updater WASM module. The updater injects content-steering tags (`#EXT-X-CONTENT-STEERING` for HLS, `<ContentSteering>` for DASH), clones variants per pathway, and encodes session state into a URL-safe base64 `_ss` parameter in the steering URI.
 
-3. **Edge steering** — Player periodically polls the steering URI. Edge-steering decodes `_ss`, evaluates QoE signals (throughput, current pathway), applies any active overrides from main-steering, and returns `PATHWAY-PRIORITY` (HLS) or `SERVICE-LOCATION-PRIORITY` (DASH) with a `TTL` and `RELOAD-URI`.
+3. **Edge steering** — Player periodically polls the steering URI. Edge-steering decodes `_ss`, evaluates QoE signals (throughput, current pathway), applies any active overrides from main-steering, and returns `PATHWAY-PRIORITY` with a `TTL` and `RELOAD-URI`. DASH responses also include `SERVICE-LOCATION-PRIORITY` for backward compatibility with older players.
 
 4. **Override propagation** — Operators issue commands through main-steering (`POST /priorities`, `POST /exclude`, `POST /clear`). Main-steering fans these out as `ControlCommand` JSON to all registered edge fleet members via `POST /control`. Commands can target a specific region (e.g., only `us-east` edges) or apply globally (`null` region). Edge-steering enforces ordering via a monotonic generation counter — stale commands are silently rejected.
 
@@ -68,6 +68,7 @@ apex-steering/
 │   └── manifest-updater/      Rust WASM — HLS/DASH manifest transformer
 ├── packages/
 │   └── main-steering/         Node.js — control plane server
+├── docs/                      Architecture overview + roadmap
 ├── e2e/                       Cross-system E2E test suite
 │   ├── src/tests/             10 test suites (155 tests)
 │   ├── src/sandbox/           Manual testing sandbox server
@@ -125,7 +126,7 @@ Stateless edge steering server compiled to WebAssembly. Deployed at CDN edge (Ak
 - QoE-driven pathway demotion (degrades → switch CDN, TTL 10s)
 - Executes master override commands (`set_priorities`, `exclude_pathway`, `clear_overrides`)
 - Generation counter rejects stale or out-of-order commands
-- HLS (`PATHWAY-PRIORITY`) and DASH (`SERVICE-LOCATION-PRIORITY`) support
+- HLS (`PATHWAY-PRIORITY`) and DASH (`PATHWAY-PRIORITY` + `SERVICE-LOCATION-PRIORITY`) support
 - ~200 KB WASM binary, 97 unit tests + 12 integration tests
 
 ### crates/manifest-updater
@@ -133,7 +134,8 @@ Stateless edge steering server compiled to WebAssembly. Deployed at CDN edge (Ak
 HLS/DASH manifest transformer compiled to WebAssembly. Runs at origin or CDN edge.
 
 - Injects `#EXT-X-CONTENT-STEERING` (HLS) or `<ContentSteering>` (DASH)
-- Clones HLS variants per pathway, adds DASH BaseURL elements
+- Clones HLS variants and media renditions per pathway with per-pathway GROUP-ID suffixing (RFC 8216bis compliant)
+- Adds DASH `<BaseURL serviceLocation="...">` elements per pathway
 - Encodes session state to URL-safe base64 `_ss` parameter
 - Wire-compatible encoding with edge-steering
 - 20 unit tests + 7 integration tests
@@ -178,7 +180,7 @@ Three-panel layout with embedded video player:
 
 - **Left panel** — CDN provider configuration (ID, name, base URL, pricing, weight, enabled). Pre-configured with 3 local fake CDNs (`test/cdna/`, `test/cdnb/`, `test/cdnc/`). Protocol toggle (HLS/DASH), region, bitrate, and manifest path settings.
 - **Center** — Embedded hls.js/dash.js video player with live steering event feed and transformed manifest preview. Click "Apply & Play" to configure providers, initialize a session, transform the manifest, and start playback through the full steering pipeline.
-- **Right panel** — Full main-steering control: set priorities, exclude pathways, clear overrides, fleet management (register/deregister edge instances), contract configuration, direct edge control commands, encode/decode session state, and live system status with auto-refresh.
+- **Right panel** — Main-steering control: set priorities, exclude pathways, clear overrides, fleet management (register/deregister edge instances), contract configuration, and live system status with auto-refresh.
 
 #### Local Content Testing
 
@@ -235,7 +237,16 @@ interface SteeringResponse {
   VERSION: number;                       // Always 1
   TTL: number;                           // 300 (normal) or 10 (QoE event)
   "RELOAD-URI"?: string;                 // Next poll URL with updated _ss
-  "PATHWAY-PRIORITY"?: string[];         // HLS CDN order
-  "SERVICE-LOCATION-PRIORITY"?: string[];// DASH CDN order
+  "PATHWAY-PRIORITY"?: string[];         // CDN order (HLS + DASH)
+  "SERVICE-LOCATION-PRIORITY"?: string[];// CDN order (DASH only, backward compat)
 }
 ```
+
+## Roadmap
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for tracked future work including:
+- SERVICE-LOCATION-PRIORITY deprecation timeline
+- DASH BaseURL placement review
+- Production hardening (rate limiting, auth, persistent storage, metrics)
+- Multi-region deployment support
+- Architecture documentation suite

@@ -43,6 +43,7 @@ npm run dev                # Start all services + sandbox dashboard
 | Sample fixtures | `e2e/fixtures/` |
 | Sandbox dashboard | `ui/index.html` |
 | Test content (fake CDN origins) | `test/cdna/`, `test/cdnb/`, `test/cdnc/` |
+| Documentation + roadmap | `docs/` |
 | CDN edge wrappers | `wrappers/edge-steering/`, `wrappers/manifest-updater/` |
 
 ## Wire Protocol
@@ -77,13 +78,13 @@ current) are rejected by edge-steering.
 - **`types.rs`** / `state.rs` — `SessionState`, `SteeringRequest`, parsing, encoding
 - **`policy.rs`** — Priority calculation with QoE demotion logic
 - **`control.rs`** — Override state management with generation counters
-- **`response.rs`** — Build `SteeringResponse` with `RELOAD-URI`
+- **`response.rs`** — Build `SteeringResponse` with `RELOAD-URI` (DASH returns both `PATHWAY-PRIORITY` and `SERVICE-LOCATION-PRIORITY` for backward compat)
 
 ## Manifest-Updater Architecture (Rust)
 
 - **`lib.rs`** — WASM entry points: `update_manifest`, `update_hls`, `update_dash`, `encode_state`
-- **`hls/mod.rs`** — HLS transform: inject `#EXT-X-CONTENT-STEERING`, clone variants per pathway
-- **`dash/mod.rs`** — DASH transform: inject `<ContentSteering>`, add `<BaseURL>` per pathway
+- **`hls/mod.rs`** — HLS transform: inject `#EXT-X-CONTENT-STEERING`, clone media renditions with per-pathway GROUP-ID suffixing, clone variants per pathway with updated group references (AUDIO, SUBTITLES, VIDEO, CLOSED-CAPTIONS)
+- **`dash/mod.rs`** — DASH transform: inject `<ContentSteering>`, add `<BaseURL serviceLocation="...">` per pathway
 - **`encode.rs`** — Session state base64url encoding
 - **`types.rs`** — `ManifestUpdateRequest`, `SessionState`, `PathwayMapping`
 
@@ -100,6 +101,8 @@ current) are rejected by edge-steering.
 - All base64 encoding is URL-safe with no padding (`base64::URL_SAFE_NO_PAD`)
 - Edge-steering gracefully handles invalid `_ss` (falls back to stored initial state instead of erroring)
 - Manifest-updater returns empty string for empty input, returns input unchanged for unknown format
+- HLS manifest-updater: `PATHWAY-ID` is only valid on `#EXT-X-STREAM-INF`, NOT on `#EXT-X-MEDIA` (RFC 8216bis). Rendition groups are associated with pathways through per-pathway GROUP-ID suffixing (e.g., `audio` → `audio_cdn-a`)
+- DASH steering responses include both `PATHWAY-PRIORITY` and `SERVICE-LOCATION-PRIORITY` for backward compatibility (CTA-5004 spec uses `PATHWAY-PRIORITY`; `SERVICE-LOCATION-PRIORITY` is from an early draft)
 
 ## Ports
 
