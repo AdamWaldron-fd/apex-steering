@@ -124,8 +124,10 @@ mod tests {
         )
         .unwrap();
 
-        assert!(resp.pathway_priority.is_none());
+        // DASH returns both PATHWAY-PRIORITY and SERVICE-LOCATION-PRIORITY
+        assert!(resp.pathway_priority.is_some());
         assert!(resp.service_location_priority.is_some());
+        assert_eq!(resp.pathway_priority.unwrap(), vec!["alpha", "beta"]);
         assert_eq!(resp.service_location_priority.unwrap(), vec!["alpha", "beta"]);
     }
 
@@ -500,7 +502,8 @@ mod tests {
         let json = serde_json::to_string(&resp).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["VERSION"], 1);
+        // DASH returns both per CTA-5004 spec (PATHWAY-PRIORITY) + backward compat (SERVICE-LOCATION-PRIORITY)
+        assert!(parsed["PATHWAY-PRIORITY"].is_array());
         assert!(parsed["SERVICE-LOCATION-PRIORITY"].is_array());
-        assert!(parsed.get("PATHWAY-PRIORITY").is_none());
     }
 }

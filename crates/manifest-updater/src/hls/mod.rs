@@ -5,8 +5,9 @@ use crate::types::PathwayMapping;
 /// Transform an HLS multivariant playlist for content steering.
 ///
 /// 1. Injects or replaces `#EXT-X-CONTENT-STEERING` tag
-/// 2. Clones `#EXT-X-STREAM-INF` variants for each pathway with `PATHWAY-ID` and `STABLE-VARIANT-ID`
-/// 3. Clones `#EXT-X-MEDIA` renditions for each pathway with `PATHWAY-ID`
+/// 2. Clones `#EXT-X-MEDIA` renditions per pathway with pathway-suffixed GROUP-IDs
+/// 3. Clones `#EXT-X-STREAM-INF` variants per pathway with `PATHWAY-ID`, `STABLE-VARIANT-ID`,
+///    and updated group references (AUDIO, SUBTITLES, VIDEO, CLOSED-CAPTIONS)
 pub fn transform(
     manifest: &str,
     steering_url: &str,
@@ -21,11 +22,12 @@ pub fn transform(
     // Step 1: inject/replace steering tag
     let with_tag = inject_steering_tag(manifest, steering_url, default_pathway);
 
-    // Step 2: clone variants per pathway
-    let with_variants = clone_stream_inf_variants(&with_tag, pathways);
+    // Step 2: clone media renditions per pathway (must happen before variants
+    // so GROUP-IDs are already suffixed when variants reference them)
+    let with_renditions = clone_media_renditions(&with_tag, pathways);
 
-    // Step 3: clone media renditions per pathway
-    clone_media_renditions(&with_variants, pathways)
+    // Step 3: clone variants per pathway with updated group references
+    clone_stream_inf_variants(&with_renditions, pathways)
 }
 
 /// Inject or replace the `#EXT-X-CONTENT-STEERING` tag.
@@ -62,6 +64,7 @@ fn inject_steering_tag(manifest: &str, steering_url: &str, default_pathway: &str
 /// For each original variant, produces one copy per pathway with:
 /// - `PATHWAY-ID="<pathway_id>"` attribute added
 /// - `STABLE-VARIANT-ID="<id>"` attribute derived from original attributes
+/// - Group references (AUDIO, SUBTITLES, VIDEO, CLOSED-CAPTIONS) suffixed with `_<pathway_id>`
 /// - URI rewritten with the pathway's base_url prefix
 fn clone_stream_inf_variants(manifest: &str, pathways: &[PathwayMapping]) -> String {
     let stream_inf_re =
@@ -71,12 +74,9 @@ fn clone_stream_inf_variants(manifest: &str, pathways: &[PathwayMapping]) -> Str
         return manifest.to_string();
     }
 
-    // Collect non-variant lines (everything before/between/after variant blocks)
-    // and variant blocks separately
     let mut result = String::with_capacity(manifest.len() * pathways.len());
     let mut last_end = 0;
     let mut variant_id: u32 = 0;
-    let mut variants: Vec<(String, String)> = Vec::new(); // (attributes, uri)
 
     for cap in stream_inf_re.captures_iter(manifest) {
         let full_match = cap.get(0).unwrap();
@@ -87,14 +87,18 @@ fn clone_stream_inf_variants(manifest: &str, pathways: &[PathwayMapping]) -> Str
         let attrs = cap.get(1).unwrap().as_str();
         let uri = cap.get(2).unwrap().as_str();
 
-        variants.push((attrs.to_string(), uri.to_string()));
-
         // Generate one variant per pathway
         let stable_id = format!("v{}", variant_id);
         for pathway in pathways {
             // Strip any existing PATHWAY-ID or STABLE-VARIANT-ID
             let clean_attrs = strip_attribute(attrs, "PATHWAY-ID");
             let clean_attrs = strip_attribute(&clean_attrs, "STABLE-VARIANT-ID");
+
+            // Suffix group references so each pathway's variants use pathway-specific rendition groups
+            let clean_attrs = suffix_group_ref(&clean_attrs, "AUDIO", &pathway.pathway_id);
+            let clean_attrs = suffix_group_ref(&clean_attrs, "SUBTITLES", &pathway.pathway_id);
+            let clean_attrs = suffix_group_ref(&clean_attrs, "VIDEO", &pathway.pathway_id);
+            let clean_attrs = suffix_group_ref(&clean_attrs, "CLOSED-CAPTIONS", &pathway.pathway_id);
 
             result.push_str(&format!(
                 "{},PATHWAY-ID=\"{}\",STABLE-VARIANT-ID=\"{}\"\n{}\n",
@@ -125,8 +129,12 @@ fn clone_stream_inf_variants(manifest: &str, pathways: &[PathwayMapping]) -> Str
 
 /// Clone `#EXT-X-MEDIA` tags for each pathway.
 ///
+/// Per RFC 8216bis Section 7.1, rendition groups are implicitly associated with
+/// pathways through the GROUP-ID reference on `#EXT-X-STREAM-INF`. `PATHWAY-ID`
+/// is NOT a valid attribute on `#EXT-X-MEDIA`.
+///
 /// Each media tag gets duplicated per pathway with:
-/// - `PATHWAY-ID="<pathway_id>"` added
+/// - `GROUP-ID` suffixed with `_<pathway_id>` (e.g., `"audio"` → `"audio_cdn-a"`)
 /// - `URI` rewritten with the pathway's base_url prefix
 fn clone_media_renditions(manifest: &str, pathways: &[PathwayMapping]) -> String {
     let media_re = Regex::new(r"(?m)^(#EXT-X-MEDIA:.+)$").unwrap();
@@ -147,10 +155,9 @@ fn clone_media_renditions(manifest: &str, pathways: &[PathwayMapping]) -> String
         for pathway in pathways {
             let clean_tag = strip_attribute(tag, "PATHWAY-ID");
             let rewritten = rewrite_media_uri(&clean_tag, &pathway.base_url);
-            result.push_str(&format!(
-                "{},PATHWAY-ID=\"{}\"\n",
-                rewritten, pathway.pathway_id,
-            ));
+            let with_group = suffix_group_id(&rewritten, &pathway.pathway_id);
+            result.push_str(&with_group);
+            result.push('\n');
         }
 
         last_end = full_match.end();
@@ -177,6 +184,35 @@ fn strip_attribute(tag: &str, attr_name: &str) -> String {
     let pattern2 = format!(r",\s*{}=[^,]*", regex::escape(attr_name));
     let re2 = Regex::new(&pattern2).unwrap();
     re2.replace(&result, "").into_owned()
+}
+
+/// Suffix the GROUP-ID attribute value on an `#EXT-X-MEDIA` tag.
+/// E.g., `GROUP-ID="audio"` → `GROUP-ID="audio_cdn-a"`
+fn suffix_group_id(tag: &str, pathway_id: &str) -> String {
+    let re = Regex::new(r#"GROUP-ID="([^"]*)""#).unwrap();
+    if let Some(cap) = re.captures(tag) {
+        let original = cap.get(1).unwrap().as_str();
+        re.replace(tag, format!("GROUP-ID=\"{}_{}\"", original, pathway_id).as_str())
+            .into_owned()
+    } else {
+        tag.to_string()
+    }
+}
+
+/// Suffix a group reference attribute on `#EXT-X-STREAM-INF`.
+/// E.g., `AUDIO="audio"` → `AUDIO="audio_cdn-a"`
+///
+/// Only modifies the attribute if it exists and has a quoted value.
+fn suffix_group_ref(tag: &str, attr_name: &str, pathway_id: &str) -> String {
+    let pattern = format!(r#"{}="([^"]*)""#, regex::escape(attr_name));
+    let re = Regex::new(&pattern).unwrap();
+    if let Some(cap) = re.captures(tag) {
+        let original = cap.get(1).unwrap().as_str();
+        re.replace(tag, format!("{}=\"{}_{}\"", attr_name, original, pathway_id).as_str())
+            .into_owned()
+    } else {
+        tag.to_string()
+    }
 }
 
 /// Rewrite a URI by prepending a CDN base URL.
@@ -321,8 +357,10 @@ mod tests {
 
         let count = result.matches("#EXT-X-MEDIA").count();
         assert_eq!(count, 2);
-        assert!(result.contains("PATHWAY-ID=\"cdn-a\""));
-        assert!(result.contains("PATHWAY-ID=\"cdn-b\""));
+        // GROUP-ID suffixed per pathway (not PATHWAY-ID — that's not spec-valid on EXT-X-MEDIA)
+        assert!(result.contains("GROUP-ID=\"audio_cdn-a\""));
+        assert!(result.contains("GROUP-ID=\"audio_cdn-b\""));
+        assert!(!result.contains("PATHWAY-ID"));
         assert!(result.contains("https://cdn-a.example.com/audio/en.m3u8"));
         assert!(result.contains("https://cdn-b.example.com/audio/en.m3u8"));
     }
@@ -343,12 +381,44 @@ mod tests {
 
         // Steering tag present
         assert!(result.contains("#EXT-X-CONTENT-STEERING"));
-        assert!(result.contains("PATHWAY-ID=\"cdn-a\""));
 
         // 2 variants × 2 pathways = 4 STREAM-INF entries
         assert_eq!(result.matches("#EXT-X-STREAM-INF").count(), 4);
 
         // 1 media × 2 pathways = 2 MEDIA entries
         assert_eq!(result.matches("#EXT-X-MEDIA").count(), 2);
+
+        // Pathway-specific GROUP-IDs on media renditions
+        assert!(result.contains("GROUP-ID=\"audio_cdn-a\""));
+        assert!(result.contains("GROUP-ID=\"audio_cdn-b\""));
+
+        // Variants reference pathway-specific audio groups
+        assert!(result.contains("AUDIO=\"audio_cdn-a\""));
+        assert!(result.contains("AUDIO=\"audio_cdn-b\""));
+
+        // PATHWAY-ID on variants (not on media)
+        assert!(result.contains("PATHWAY-ID=\"cdn-a\""));
+        assert!(result.contains("PATHWAY-ID=\"cdn-b\""));
+    }
+
+    #[test]
+    fn suffix_group_id_works() {
+        let tag = "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio\",NAME=\"English\"";
+        let result = suffix_group_id(tag, "cdn-a");
+        assert_eq!(result, "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio_cdn-a\",NAME=\"English\"");
+    }
+
+    #[test]
+    fn suffix_group_ref_works() {
+        let tag = "#EXT-X-STREAM-INF:BANDWIDTH=2000000,AUDIO=\"audio\"";
+        let result = suffix_group_ref(tag, "AUDIO", "cdn-a");
+        assert_eq!(result, "#EXT-X-STREAM-INF:BANDWIDTH=2000000,AUDIO=\"audio_cdn-a\"");
+    }
+
+    #[test]
+    fn suffix_group_ref_noop_when_missing() {
+        let tag = "#EXT-X-STREAM-INF:BANDWIDTH=2000000";
+        let result = suffix_group_ref(tag, "AUDIO", "cdn-a");
+        assert_eq!(result, "#EXT-X-STREAM-INF:BANDWIDTH=2000000");
     }
 }

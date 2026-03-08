@@ -160,8 +160,9 @@ describe("DASH Full Session", () => {
       expect(resp.TTL).toBeGreaterThan(0);
     });
 
-    it("DASH uses SERVICE-LOCATION-PRIORITY (not PATHWAY-PRIORITY)", async () => {
+    it("DASH returns both PATHWAY-PRIORITY and SERVICE-LOCATION-PRIORITY", async () => {
       const resp = await edge.steerDash({ _ss: ssParam });
+      expect(resp["PATHWAY-PRIORITY"]).toBeDefined();
       expect(resp["SERVICE-LOCATION-PRIORITY"]).toBeDefined();
     });
 

@@ -601,6 +601,7 @@ async function applyAndPlay() {
     dashPlayer = dashjs.MediaPlayer().create();
     dashPlayer.updateSettings({
       debug: { logLevel: dashjs.Debug.LOG_LEVEL_NONE },
+      streaming: { applyContentSteering: true },
     });
     dashPlayer.on('error', (e) => {
       logSteering(`DASH error: ${e.error?.message || JSON.stringify(e)}`, 'err');
@@ -610,6 +611,10 @@ async function applyAndPlay() {
     });
     dashPlayer.on('qualityChangeRendered', (e) => {
       logSteering(`Quality changed: ${e.mediaType} -> ${e.newQuality}`, 'info');
+    });
+    dashPlayer.on(dashjs.MediaPlayer.events.CONTENT_STEERING_REQUEST_COMPLETED, (e) => {
+      const data = e.currentSteeringResponseData || e;
+      logSteering(`DASH steering response: ${JSON.stringify(data)}`, 'ok');
     });
     dashPlayer.initialize(video, currentManifestBlob, true);
   }

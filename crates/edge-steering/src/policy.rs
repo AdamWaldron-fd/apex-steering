@@ -187,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn dash_uses_service_location_priority() {
+    fn dash_uses_both_priority_fields() {
         let state = make_state();
         let resp = evaluate(
             Protocol::Dash,
@@ -197,8 +197,14 @@ mod tests {
             &OverrideState::default(),
             &PolicyConfig::default(),
         );
-        assert!(resp.pathway_priority.is_none());
+        // CTA-5004 spec and dash.js use PATHWAY-PRIORITY for DASH.
+        // We return both for backward compatibility.
+        assert!(resp.pathway_priority.is_some());
         assert!(resp.service_location_priority.is_some());
+        assert_eq!(
+            resp.pathway_priority.unwrap(),
+            vec!["alpha", "beta", "gamma"]
+        );
         assert_eq!(
             resp.service_location_priority.unwrap(),
             vec!["alpha", "beta", "gamma"]

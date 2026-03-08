@@ -169,11 +169,13 @@ fn dash_full_session_lifecycle() {
     assert_eq!(resp1.version, 1);
     assert!(resp1.service_location_priority.is_some());
     assert_eq!(resp1.service_location_priority.as_ref().unwrap(), &vec!["alpha", "beta"]);
-    assert!(resp1.pathway_priority.is_none());
+    // DASH now returns both PATHWAY-PRIORITY and SERVICE-LOCATION-PRIORITY per CTA-5004
+    assert!(resp1.pathway_priority.is_some());
+    assert_eq!(resp1.pathway_priority.as_ref().unwrap(), &vec!["alpha", "beta"]);
 
     let v: serde_json::Value = serde_json::from_str(&json1).unwrap();
     assert!(v.get("SERVICE-LOCATION-PRIORITY").is_some());
-    assert!(v.get("PATHWAY-PRIORITY").is_none());
+    assert!(v.get("PATHWAY-PRIORITY").is_some());
 
     // ── Request 2: Player reports pathway and throughput ──────────────────
     let reload_query = extract_query(resp1.reload_uri.as_ref().unwrap());

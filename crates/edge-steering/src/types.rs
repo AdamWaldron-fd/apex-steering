@@ -101,6 +101,13 @@ pub struct SteeringResponse {
     pub pathway_priority: Option<Vec<String>>,
 
     /// DASH: Ordered service-location preference list.
+    ///
+    /// TODO(roadmap): SERVICE-LOCATION-PRIORITY was from an early DASH Content Steering draft.
+    /// The final CTA-5004 spec and dash.js both use PATHWAY-PRIORITY for DASH. We currently
+    /// return both for backward compatibility. Once we confirm no deployed players depend on
+    /// SERVICE-LOCATION-PRIORITY, remove this field and update SteeringResponse::new() to
+    /// only set pathway_priority for DASH (same as HLS). Track via E2E dash-session tests
+    /// and any production DASH player integrations.
     #[serde(
         rename = "SERVICE-LOCATION-PRIORITY",
         skip_serializing_if = "Option::is_none"
@@ -113,7 +120,9 @@ impl SteeringResponse {
     pub fn new(protocol: Protocol, priorities: Vec<String>, ttl: u32) -> Self {
         let (pathway_priority, service_location_priority) = match protocol {
             Protocol::Hls => (Some(priorities), None),
-            Protocol::Dash => (None, Some(priorities)),
+            // CTA-5004 spec and dash.js both use PATHWAY-PRIORITY for DASH.
+            // Keep SERVICE-LOCATION-PRIORITY for backward compatibility.
+            Protocol::Dash => (Some(priorities.clone()), Some(priorities)),
         };
         Self {
             version: 1,
