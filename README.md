@@ -72,6 +72,10 @@ apex-steering/
 │   ├── src/tests/             10 test suites (155 tests)
 │   ├── src/sandbox/           Manual testing sandbox server
 │   └── fixtures/              Sample HLS/DASH manifests
+├── test/                      Local test content (fake CDN origins)
+│   ├── cdna/                  CDN Alpha content directory
+│   ├── cdnb/                  CDN Beta content directory
+│   └── cdnc/                  CDN Gamma content directory
 ├── ui/                        Sandbox dashboard (HTML)
 ├── wrappers/                  CDN edge platform deploy wrappers
 │   ├── edge-steering/         Akamai, Cloudflare, CloudFront, Fastly
@@ -170,7 +174,21 @@ Browser-based dashboard for manual testing and demos at `http://localhost:5555`.
 npm run dev    # starts all services + sandbox
 ```
 
-Sections: Health indicators, Session Init, Set Priorities / Exclude, Edge Steer, Manifest Updater, System Status, Encode/Decode State, Event Log.
+Three-panel layout with embedded video player:
+
+- **Left panel** — CDN provider configuration (ID, name, base URL, pricing, weight, enabled). Pre-configured with 3 local fake CDNs (`test/cdna/`, `test/cdnb/`, `test/cdnc/`). Protocol toggle (HLS/DASH), region, bitrate, and manifest path settings.
+- **Center** — Embedded hls.js/dash.js video player with live steering event feed and transformed manifest preview. Click "Apply & Play" to configure providers, initialize a session, transform the manifest, and start playback through the full steering pipeline.
+- **Right panel** — Full main-steering control: set priorities, exclude pathways, clear overrides, fleet management (register/deregister edge instances), contract configuration, direct edge control commands, encode/decode session state, and live system status with auto-refresh.
+
+#### Local Content Testing
+
+Place identical CMAF-packaged content in `test/cdna/`, `test/cdnb/`, and `test/cdnc/` to simulate multiple CDN origins. The sandbox serves these directories as static files with proper media MIME types and range request support.
+
+See **[test/README.md](test/README.md)** for:
+- Step-by-step sandbox walkthrough (register fleet → play → steer → exclude → clear)
+- CMAF packaging instructions (ffmpeg, Shaka Packager)
+- How the steering loop works between hls.js, the sandbox proxy, and edge-steering
+- Troubleshooting guide
 
 ## Development
 

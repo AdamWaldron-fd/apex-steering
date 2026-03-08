@@ -45,4 +45,9 @@ export class AppState {
     this._generation++;
     return this._generation;
   }
+
+  /** Hot-swap the CDN registry (sandbox use). */
+  setCdnRegistry(registry: CdnRegistry): void {
+    this.cdnRegistry = registry;
+  }
 }

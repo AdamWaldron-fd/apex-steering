@@ -42,6 +42,7 @@ npm run dev                # Start all services + sandbox dashboard
 | WASM bridge (manifest-updater) | `e2e/src/helpers/manifest-bridge.ts` |
 | Sample fixtures | `e2e/fixtures/` |
 | Sandbox dashboard | `ui/index.html` |
+| Test content (fake CDN origins) | `test/cdna/`, `test/cdnb/`, `test/cdnc/` |
 | CDN edge wrappers | `wrappers/edge-steering/`, `wrappers/manifest-updater/` |
 
 ## Wire Protocol
@@ -59,8 +60,8 @@ current) are rejected by edge-steering.
 ## Main-Steering Architecture
 
 - **`server.ts`** — Entry point, default CDN providers, port config (`--port` flag)
-- **`app.ts`** — Hono route handlers: `/health`, `/session/init`, `/priorities`, `/exclude`, `/clear`, `/fleet/register`, `/fleet/:id`, `/status`
-- **`state.ts`** — `AppState` class with generation counter
+- **`app.ts`** — Hono route handlers: `/health`, `/session/init`, `/priorities`, `/exclude`, `/clear`, `/fleet/register`, `/fleet/:id`, `/status`, `/providers` (sandbox hot-swap), `/contracts` (sandbox hot-swap)
+- **`state.ts`** — `AppState` class with generation counter, `setCdnRegistry()` for sandbox hot-swap
 - **`cdn.ts`** — `CdnProvider`, `CdnRegistry` (pathway IDs, base URLs, pricing, regions)
 - **`contracts.ts`** — `CommitTracker` for contract volume commitments
 - **`priority.ts`** — CDN scoring engine (contract weight + COGS + availability)

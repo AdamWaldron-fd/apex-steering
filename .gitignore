@@ -4,3 +4,5 @@ pkg/
 pkg-node/
 target/
 *.js.map
+/test/cdn*
+/test/Big*

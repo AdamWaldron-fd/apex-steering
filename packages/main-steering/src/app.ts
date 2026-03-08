@@ -6,6 +6,8 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { AppState } from "./state.js";
+import { CdnRegistry, type CdnProvider } from "./cdn.js";
+import { CommitTracker, type Contract, type ContractUsage } from "./contracts.js";
 import { parseEdgePlatform, type EdgeInstance } from "./fleet.js";
 import { buildManifestUpdateRequest } from "./sessions.js";
 import { propagateCommand } from "./propagation.js";
@@ -218,6 +220,38 @@ export function createApp(state: AppState): Hono {
       contracts: state.commitTracker.contracts,
       usage: state.commitTracker.usage,
     });
+  });
+
+  // ── Sandbox: Hot-swap Providers ───────────────────────────────────────────
+
+  app.post("/providers", async (c) => {
+    const providers = await c.req.json<CdnProvider[]>();
+
+    if (!Array.isArray(providers) || providers.length === 0) {
+      return c.json({ error: "providers array is required" }, 400);
+    }
+
+    state.setCdnRegistry(new CdnRegistry(providers));
+    return c.json({ status: "ok", count: providers.length });
+  });
+
+  // ── Sandbox: Hot-swap Contracts ───────────────────────────────────────────
+
+  app.post("/contracts", async (c) => {
+    const body = await c.req.json<{
+      contracts: Contract[];
+      usage?: ContractUsage[];
+    }>();
+
+    if (!Array.isArray(body.contracts)) {
+      return c.json({ error: "contracts array is required" }, 400);
+    }
+
+    state.commitTracker = new CommitTracker(
+      body.contracts,
+      body.usage ?? [],
+    );
+    return c.json({ status: "ok", count: body.contracts.length });
   });
 
   // ── Dev UI ──────────────────────────────────────────────────────────────

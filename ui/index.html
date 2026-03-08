@@ -4,223 +4,391 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Apex Steering Sandbox</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dashjs@latest/dist/dash.all.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a;
-      --text: #e1e4ed; --muted: #8b8fa3; --accent: #6c8aff;
-      --green: #3dd68c; --red: #f06e6e; --yellow: #f0c95e;
-      --radius: 8px; --font: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+      --bg: #0f1117; --surface: #1a1d27; --surface2: #22252f; --border: #2a2d3a;
+      --text: #e1e4ed; --muted: #8b8fa3; --accent: #6c8aff; --accent-dim: #4a62cc;
+      --green: #3dd68c; --red: #f06e6e; --yellow: #f0c95e; --orange: #e89b5e;
+      --radius: 6px; --font: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
     }
-    body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; padding: 24px; }
-    h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-    h2 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
-    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-    .health { display: flex; gap: 16px; }
-    .health-dot { display: inline-flex; align-items: center; gap: 6px; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-    .dot.up { background: var(--green); }
-    .dot.down { background: var(--red); }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-    .full { grid-column: 1 / -1; }
-    label { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    html, body { height: 100%; overflow: hidden; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 12px; line-height: 1.5; }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .layout { display: grid; grid-template-rows: 44px 1fr; grid-template-columns: 300px 1fr 300px; height: 100vh; }
+    .topbar { grid-column: 1 / -1; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+    .panel { overflow-y: auto; border-right: 1px solid var(--border); padding: 12px; }
+    .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+    .center { overflow-y: auto; padding: 16px; }
+
+    /* ── Top bar ────────────────────────────────────────────── */
+    .topbar h1 { font-size: 13px; font-weight: 600; }
+    .topbar .health { display: flex; gap: 14px; align-items: center; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 4px; background: var(--muted); }
+    .dot.up { background: var(--green); } .dot.down { background: var(--red); }
+
+    /* ── Sections ───────────────────────────────────────────── */
+    .section { margin-bottom: 16px; }
+    .section-title { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+    .section-title .toggle { font-size: 9px; color: var(--muted); }
+    .section-body { display: block; }
+    .section-body.collapsed { display: none; }
+
+    /* ── Form elements ──────────────────────────────────────── */
+    label { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; margin-top: 6px; }
+    label:first-child { margin-top: 0; }
     input, select, textarea {
       width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
-      color: var(--text); font-family: var(--font); font-size: 12px; padding: 6px 8px; margin-bottom: 8px;
+      color: var(--text); font-family: var(--font); font-size: 11px; padding: 5px 7px; margin-bottom: 2px;
     }
-    textarea { resize: vertical; min-height: 80px; }
+    textarea { resize: vertical; min-height: 60px; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
-    button {
+    input[type="checkbox"] { width: auto; margin-right: 4px; }
+    .row { display: flex; gap: 6px; align-items: end; }
+    .row > div { flex: 1; }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    button, .btn {
       background: var(--accent); color: #fff; border: none; border-radius: 4px;
-      font-family: var(--font); font-size: 12px; font-weight: 600; padding: 6px 14px;
-      cursor: pointer; transition: opacity 0.15s;
+      font-family: var(--font); font-size: 11px; font-weight: 600; padding: 5px 12px;
+      cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
     }
-    button:hover { opacity: 0.85; }
-    button:disabled { opacity: 0.4; cursor: default; }
-    button.secondary { background: var(--border); color: var(--text); }
-    button.danger { background: var(--red); }
-    .btn-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    button:hover { opacity: 0.85; } button:disabled { opacity: 0.4; cursor: default; }
+    .btn-s { padding: 3px 8px; font-size: 10px; }
+    .btn-secondary { background: var(--border); color: var(--text); }
+    .btn-danger { background: var(--red); }
+    .btn-green { background: #2a9d5c; }
+    .btn-orange { background: var(--orange); }
+    .btn-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+    /* ── CDN cards ───────────────────────────────────────────── */
+    .cdn-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; margin-bottom: 6px; }
+    .cdn-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .cdn-id { font-weight: 700; font-size: 12px; }
+    .cdn-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 0 4px; font-family: var(--font); }
+    .cdn-remove:hover { opacity: 0.7; }
+
+    /* ── Player ──────────────────────────────────────────────── */
+    .player-wrap { background: #000; border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; position: relative; }
+    .player-wrap video { width: 100%; display: block; max-height: 360px; }
+    .player-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); color: var(--muted); font-size: 13px; pointer-events: none; }
+    .player-overlay.hidden { display: none; }
+
+    /* ── Status / Log ────────────────────────────────────────── */
     pre {
       background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
-      padding: 10px; font-size: 11px; overflow-x: auto; max-height: 300px; overflow-y: auto;
+      padding: 8px; font-size: 10px; overflow-x: auto; max-height: 200px; overflow-y: auto;
       white-space: pre-wrap; word-break: break-all; color: var(--muted);
     }
-    pre.result { color: var(--green); }
-    pre.error { color: var(--red); }
-    .tag { display: inline-block; background: var(--border); border-radius: 3px; padding: 2px 6px; font-size: 11px; margin: 2px; }
-    .inline-fields { display: flex; gap: 8px; }
-    .inline-fields > div { flex: 1; }
-    .section-sep { border-top: 1px solid var(--border); margin: 12px 0; }
+    pre.ok { color: var(--green); } pre.err { color: var(--red); }
+
+    /* ── Fleet list ──────────────────────────────────────────── */
+    .fleet-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 10px; }
+    .fleet-row:last-child { border-bottom: none; }
+
+    /* ── Event log ───────────────────────────────────────────── */
+    .event-log { font-size: 10px; max-height: 150px; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
+    .event-log .ev { margin-bottom: 2px; }
+    .ev-time { color: var(--muted); } .ev-ok { color: var(--green); } .ev-err { color: var(--red); } .ev-info { color: var(--accent); }
+
+    /* ── Scrollbar ───────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
   </style>
 </head>
 <body>
 
-<div class="header">
-  <div>
+<div class="layout">
+  <!-- TOP BAR -->
+  <div class="topbar">
     <h1>Apex Steering Sandbox</h1>
-    <span style="color:var(--muted)">Manual testing dashboard for content-steering</span>
-  </div>
-  <div class="health">
-    <span class="health-dot"><span class="dot" id="dot-main"></span> main-steering</span>
-    <span class="health-dot"><span class="dot" id="dot-edge"></span> edge-steering</span>
-    <button class="secondary" onclick="checkHealth()">Refresh</button>
-  </div>
-</div>
-
-<div class="grid">
-  <!-- Session Init -->
-  <div class="card">
-    <h2>Session Init</h2>
-    <label>CDNs (comma-separated)</label>
-    <input id="init-cdns" value="cdn-a,cdn-b" />
-    <label>Steering URI</label>
-    <input id="init-uri" value="/steer/hls" />
-    <div class="inline-fields">
-      <div><label>Region</label><input id="init-region" value="us-east" /></div>
-      <div><label>Duration (s)</label><input id="init-duration" type="number" value="600" /></div>
+    <div class="health">
+      <span><span class="dot" id="dot-main"></span>main</span>
+      <span><span class="dot" id="dot-edge"></span>edge</span>
+      <span style="color:var(--muted);font-size:10px" id="gen-display">gen: 0</span>
     </div>
-    <div class="inline-fields">
-      <div><label>Min Bitrate</label><input id="init-min-br" type="number" value="0" /></div>
-      <div><label>Max Bitrate</label><input id="init-max-br" type="number" value="10000000" /></div>
-    </div>
-    <div class="btn-row">
-      <button onclick="sessionInit()">Init Session</button>
-    </div>
-    <pre id="out-init" class="result" style="margin-top:8px"></pre>
   </div>
 
-  <!-- Priorities -->
-  <div class="card">
-    <h2>Set Priorities</h2>
-    <label>Pathway Priority (comma-separated)</label>
-    <input id="prio-list" value="cdn-a,cdn-b" />
-    <div class="inline-fields">
-      <div><label>Region (optional)</label><input id="prio-region" value="" /></div>
-      <div><label>TTL Override (s)</label><input id="prio-ttl" type="number" value="" /></div>
-    </div>
-    <div class="btn-row">
-      <button onclick="setPriorities()">Set Priorities</button>
+  <!-- LEFT PANEL: CDN SETUP -->
+  <div class="panel" id="left-panel">
+
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">CDN Providers <span class="toggle">[-]</span></div>
+      <div class="section-body" id="cdn-list"></div>
+      <div class="btn-row">
+        <button class="btn-s btn-secondary" onclick="addCdn()">+ Add CDN</button>
+      </div>
     </div>
 
-    <div class="section-sep"></div>
-    <h2>Exclude Pathway</h2>
-    <div class="inline-fields">
-      <div><label>Pathway</label><input id="excl-pathway" value="cdn-b" /></div>
-      <div><label>Region (optional)</label><input id="excl-region" value="" /></div>
+    <hr>
+
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Session Config <span class="toggle">[-]</span></div>
+      <div class="section-body">
+        <label>Protocol</label>
+        <select id="cfg-proto">
+          <option value="hls">HLS</option>
+          <option value="dash">DASH</option>
+        </select>
+        <label>Region</label>
+        <input id="cfg-region" value="us-east" />
+        <div class="row">
+          <div><label>Min Bitrate</label><input id="cfg-min-br" type="number" value="0" /></div>
+          <div><label>Max Bitrate</label><input id="cfg-max-br" type="number" value="10000000" /></div>
+        </div>
+        <label>Duration (s)</label>
+        <input id="cfg-duration" type="number" value="600" />
+        <label>Manifest Path</label>
+        <input id="cfg-manifest-path" value="master.m3u8" placeholder="e.g. master.m3u8 or manifest.mpd" />
+      </div>
     </div>
+
+    <hr>
+
     <div class="btn-row">
-      <button onclick="excludePathway()">Exclude</button>
-      <button class="danger" onclick="clearOverrides()">Clear All Overrides</button>
+      <button class="btn-green" onclick="applyAndPlay()" style="flex:1">Apply &amp; Play</button>
+      <button class="btn-secondary" onclick="applyConfig()">Apply Only</button>
     </div>
-    <pre id="out-prio" class="result" style="margin-top:8px"></pre>
+
   </div>
 
-  <!-- Edge Steer -->
-  <div class="card">
-    <h2>Edge Steer Request</h2>
-    <label>_ss (session state, base64url)</label>
-    <textarea id="steer-ss" rows="2"></textarea>
-    <div class="inline-fields">
-      <div><label>Pathway</label><input id="steer-pathway" value="" placeholder="e.g. cdn-a" /></div>
-      <div><label>Throughput</label><input id="steer-throughput" type="number" value="" placeholder="bps" /></div>
+  <!-- CENTER: PLAYER + MANIFEST -->
+  <div class="center">
+
+    <div class="player-wrap">
+      <video id="video" controls></video>
+      <div class="player-overlay" id="player-overlay">Configure CDNs and click "Apply &amp; Play"</div>
     </div>
-    <label>Protocol</label>
-    <select id="steer-proto">
-      <option value="hls">HLS</option>
-      <option value="dash">DASH</option>
-    </select>
-    <div class="btn-row">
-      <button onclick="edgeSteer()">Steer</button>
+
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Steering Events <span class="toggle">[-]</span></div>
+      <div class="section-body">
+        <div class="event-log" id="steering-log"></div>
+      </div>
     </div>
-    <pre id="out-steer" class="result" style="margin-top:8px"></pre>
+
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Transformed Manifest <span class="toggle">[+]</span></div>
+      <div class="section-body collapsed">
+        <pre id="manifest-preview" class="ok" style="max-height:300px"></pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Session State <span class="toggle">[+]</span></div>
+      <div class="section-body collapsed">
+        <pre id="session-state-preview" class="ok"></pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Event Log <span class="toggle">[+]</span></div>
+      <div class="section-body collapsed">
+        <div class="event-log" id="event-log"></div>
+        <div class="btn-row"><button class="btn-s btn-secondary" onclick="document.getElementById('event-log').innerHTML=''">Clear</button></div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Manifest Bridge -->
-  <div class="card">
-    <h2>Manifest Updater</h2>
-    <label>Source manifest</label>
-    <div class="btn-row" style="margin-bottom:8px;margin-top:0">
-      <button class="secondary" onclick="loadFixture('hls')">Load HLS</button>
-      <button class="secondary" onclick="loadFixture('dash')">Load DASH</button>
-    </div>
-    <textarea id="manifest-src" rows="6"></textarea>
-    <label>Request JSON (ManifestUpdateRequest)</label>
-    <textarea id="manifest-req" rows="4"></textarea>
-    <div class="btn-row">
-      <button onclick="updateManifest()">Update Manifest</button>
-    </div>
-    <pre id="out-manifest" class="result" style="margin-top:8px"></pre>
-  </div>
+  <!-- RIGHT PANEL: MAIN-STEERING CONTROL -->
+  <div class="panel" id="right-panel">
 
-  <!-- Status & Fleet -->
-  <div class="card">
-    <h2>System Status</h2>
-    <div class="btn-row">
-      <button onclick="getStatus()">Get Status</button>
+    <!-- Priorities -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Priorities <span class="toggle">[-]</span></div>
+      <div class="section-body">
+        <label>Priority Order (comma-separated)</label>
+        <input id="ctl-prio" value="cdn-a,cdn-b,cdn-c" />
+        <div class="row">
+          <div><label>Region</label><input id="ctl-prio-region" value="" placeholder="optional" /></div>
+          <div><label>TTL (s)</label><input id="ctl-prio-ttl" type="number" value="" placeholder="optional" /></div>
+        </div>
+        <div class="btn-row">
+          <button onclick="setPriorities()">Set Priorities</button>
+        </div>
+        <pre id="out-prio" class="ok" style="margin-top:6px;max-height:80px"></pre>
+      </div>
     </div>
-    <pre id="out-status" class="result" style="margin-top:8px"></pre>
 
-    <div class="section-sep"></div>
-    <h2>Edge Control</h2>
-    <label>Command JSON</label>
-    <textarea id="edge-cmd" rows="2">{"action":"status"}</textarea>
-    <div class="btn-row">
-      <button onclick="edgeControl()">Send</button>
-      <button class="danger" onclick="edgeReset()">Reset Edge</button>
+    <hr>
+
+    <!-- Exclude -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Exclude / Clear <span class="toggle">[-]</span></div>
+      <div class="section-body">
+        <div class="row">
+          <div><label>Pathway</label><input id="ctl-excl" value="cdn-c" /></div>
+          <div><label>Region</label><input id="ctl-excl-region" value="" placeholder="optional" /></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-orange" onclick="excludePathway()">Exclude</button>
+          <button class="btn-danger" onclick="clearOverrides()">Clear All</button>
+        </div>
+        <pre id="out-excl" class="ok" style="margin-top:6px;max-height:80px"></pre>
+      </div>
     </div>
-    <pre id="out-edge" class="result" style="margin-top:8px"></pre>
-  </div>
 
-  <!-- Encode State -->
-  <div class="card">
-    <h2>Encode / Decode State</h2>
-    <label>Session State JSON</label>
-    <textarea id="encode-json" rows="4">{
-  "priorities": ["cdn-a", "cdn-b"],
-  "throughput_map": [["cdn-a", 5000000], ["cdn-b", 3000000]],
-  "min_bitrate": 0,
-  "max_bitrate": 10000000,
-  "duration": 600,
-  "position": 0,
-  "timestamp": 0,
-  "override_gen": 0
+    <hr>
+
+    <!-- Fleet -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Fleet <span class="toggle">[-]</span></div>
+      <div class="section-body">
+        <div id="fleet-list" style="margin-bottom:6px"></div>
+        <div class="row">
+          <div><label>Platform</label>
+            <select id="fleet-platform">
+              <option value="cloudflare">cloudflare</option>
+              <option value="fastly">fastly</option>
+              <option value="akamai">akamai</option>
+              <option value="cloudfront">cloudfront</option>
+            </select>
+          </div>
+          <div><label>Region</label><input id="fleet-region" value="us-east" /></div>
+        </div>
+        <label>Control URL</label>
+        <input id="fleet-url" value="http://localhost:3077/control" />
+        <div class="btn-row">
+          <button class="btn-s" onclick="registerFleet()">Register</button>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Contracts -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Contracts <span class="toggle">[+]</span></div>
+      <div class="section-body collapsed">
+        <label>Contracts JSON</label>
+        <textarea id="ctl-contracts" rows="4">{
+  "contracts": [
+    {"cdn_id":"cdn-a","period_start":"2026-01-01","period_end":"2026-12-31","min_commit_gb":1000,"max_burst_gb":500}
+  ],
+  "usage": []
 }</textarea>
-    <div class="btn-row">
-      <button onclick="encodeState()">Encode to _ss</button>
-      <button class="secondary" onclick="decodeState()">Decode _ss</button>
+        <div class="btn-row">
+          <button class="btn-s" onclick="updateContracts()">Update</button>
+        </div>
+        <pre id="out-contracts" class="ok" style="margin-top:6px;max-height:80px"></pre>
+      </div>
     </div>
-    <pre id="out-encode" class="result" style="margin-top:8px"></pre>
 
-    <div class="section-sep"></div>
-    <label>_ss value to decode</label>
-    <input id="decode-ss" value="" placeholder="base64url _ss value" />
-  </div>
+    <hr>
 
-  <!-- Event Log -->
-  <div class="card full">
-    <h2>Event Log</h2>
-    <div class="btn-row" style="margin-bottom:8px;margin-top:0">
-      <button class="secondary" onclick="document.getElementById('log').textContent=''">Clear</button>
+    <!-- Edge Control -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Edge Control <span class="toggle">[+]</span></div>
+      <div class="section-body collapsed">
+        <label>Command JSON</label>
+        <textarea id="ctl-edge-cmd" rows="2">{"type":"set_priorities","region":null,"priorities":["cdn-b","cdn-a","cdn-c"],"generation":1,"ttl_override":null}</textarea>
+        <div class="btn-row">
+          <button class="btn-s" onclick="edgeControl()">Send</button>
+          <button class="btn-s btn-danger" onclick="edgeReset()">Reset Edge</button>
+        </div>
+        <pre id="out-edge" class="ok" style="margin-top:6px;max-height:80px"></pre>
+      </div>
     </div>
-    <pre id="log" style="max-height:200px"></pre>
+
+    <hr>
+
+    <!-- Encode/Decode -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">Encode / Decode State <span class="toggle">[+]</span></div>
+      <div class="section-body collapsed">
+        <label>Session State JSON</label>
+        <textarea id="enc-json" rows="3"></textarea>
+        <div class="btn-row">
+          <button class="btn-s" onclick="encodeState()">Encode</button>
+          <button class="btn-s btn-secondary" onclick="decodeState()">Decode</button>
+        </div>
+        <label>_ss value</label>
+        <input id="enc-ss" value="" placeholder="base64url" />
+        <pre id="out-enc" class="ok" style="margin-top:6px;max-height:80px"></pre>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Status -->
+    <div class="section">
+      <div class="section-title" onclick="toggleSection(this)">System Status <span class="toggle">[-]</span></div>
+      <div class="section-body">
+        <div class="btn-row" style="margin-bottom:6px">
+          <button class="btn-s btn-secondary" onclick="refreshStatus()">Refresh</button>
+          <label style="margin:0;display:inline-flex;align-items:center;font-size:10px">
+            <input type="checkbox" id="auto-refresh" checked /> Auto
+          </label>
+        </div>
+        <pre id="out-status" class="ok" style="max-height:200px"></pre>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script>
+// ═══ Globals ═══════════════════════════════════════════════════════════════
+
 const $ = (id) => document.getElementById(id);
 const API = '';
+let hlsPlayer = null;
+let dashPlayer = null;
+let currentManifestBlob = null;
 
-function log(msg, isError) {
-  const el = $('log');
-  const ts = new Date().toLocaleTimeString();
-  el.textContent = `[${ts}] ${msg}\n` + el.textContent;
+// Default CDN configuration — local test directories
+let cdns = [
+  { id: 'cdn-a', name: 'CDN Alpha', base_url: `${location.origin}/test/cdna/`, regions: ['us-east','us-west'], pricing: { cost_per_gb: 0.04, burst_cost_per_gb: 0.08, currency: 'USD' }, weight: 0.6, enabled: true },
+  { id: 'cdn-b', name: 'CDN Beta', base_url: `${location.origin}/test/cdnb/`, regions: ['us-east','eu-west'], pricing: { cost_per_gb: 0.05, burst_cost_per_gb: 0.10, currency: 'USD' }, weight: 0.4, enabled: true },
+  { id: 'cdn-c', name: 'CDN Gamma', base_url: `${location.origin}/test/cdnc/`, regions: ['eu-west','ap-east'], pricing: { cost_per_gb: 0.06, burst_cost_per_gb: 0.12, currency: 'USD' }, weight: 0.3, enabled: true },
+];
+
+// ═══ Section toggle ════════════════════════════════════════════════════════
+
+function toggleSection(titleEl) {
+  const body = titleEl.nextElementSibling;
+  const toggle = titleEl.querySelector('.toggle');
+  if (body.classList.contains('collapsed')) {
+    body.classList.remove('collapsed');
+    toggle.textContent = '[-]';
+  } else {
+    body.classList.add('collapsed');
+    toggle.textContent = '[+]';
+  }
 }
+
+// ═══ Event logging ═════════════════════════════════════════════════════════
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function logEvent(msg, type = 'info') {
+  const el = $('event-log');
+  const ts = new Date().toLocaleTimeString();
+  el.innerHTML = `<div class="ev"><span class="ev-time">[${ts}]</span> <span class="ev-${type}">${escHtml(msg)}</span></div>` + el.innerHTML;
+}
+
+function logSteering(msg, type = 'info') {
+  const el = $('steering-log');
+  const ts = new Date().toLocaleTimeString();
+  el.innerHTML = `<div class="ev"><span class="ev-time">[${ts}]</span> <span class="ev-${type}">${escHtml(msg)}</span></div>` + el.innerHTML;
+}
+
+// ═══ API helper ════════════════════════════════════════════════════════════
 
 async function api(path, opts = {}) {
   const method = opts.method || 'GET';
   const body = opts.body;
-  log(`${method} ${path}`);
+  logEvent(`${method} ${path}`);
   try {
     const resp = await fetch(`${API}${path}`, {
       method,
@@ -231,115 +399,285 @@ async function api(path, opts = {}) {
     let data;
     try { data = JSON.parse(text); } catch { data = text; }
     if (!resp.ok) {
-      log(`Error ${resp.status}: ${text}`, true);
+      logEvent(`Error ${resp.status}: ${text}`, 'err');
       return { ok: false, status: resp.status, data };
     }
     return { ok: true, status: resp.status, data };
   } catch (e) {
-    log(`Network error: ${e.message}`, true);
+    logEvent(`Network error: ${e.message}`, 'err');
     return { ok: false, status: 0, data: e.message };
   }
 }
 
 function show(elId, result) {
   const el = $(elId);
-  el.className = result.ok ? 'result' : 'error';
+  el.className = result.ok ? 'ok' : 'err';
   el.textContent = typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2);
 }
 
-async function checkHealth() {
-  const r = await api('/api/health');
-  if (r.ok) {
-    $('dot-main').className = r.data.main_steering ? 'dot up' : 'dot down';
-    $('dot-edge').className = r.data.edge_steering ? 'dot up' : 'dot down';
-    log(`Health: main=${r.data.main_steering}, edge=${r.data.edge_steering}`);
-  }
+// ═══ CDN Management ════════════════════════════════════════════════════════
+
+function renderCdns() {
+  const container = $('cdn-list');
+  container.innerHTML = cdns.map((cdn, i) => `
+    <div class="cdn-card" data-idx="${i}">
+      <div class="cdn-header">
+        <span class="cdn-id">${escHtml(cdn.id)}</span>
+        <button class="cdn-remove" onclick="removeCdn(${i})" title="Remove">&times;</button>
+      </div>
+      <label>Name</label>
+      <input value="${escHtml(cdn.name)}" onchange="cdns[${i}].name=this.value" />
+      <label>Base URL</label>
+      <input value="${escHtml(cdn.base_url)}" onchange="cdns[${i}].base_url=this.value" />
+      <div class="row">
+        <div><label>$/GB</label><input type="number" step="0.01" value="${cdn.pricing.cost_per_gb}" onchange="cdns[${i}].pricing.cost_per_gb=+this.value" /></div>
+        <div><label>Weight</label><input type="number" step="0.1" min="0" max="1" value="${cdn.weight}" onchange="cdns[${i}].weight=+this.value" /></div>
+      </div>
+      <div class="row">
+        <div><label>Regions</label><input value="${cdn.regions.join(',')}" onchange="cdns[${i}].regions=this.value.split(',').map(s=>s.trim()).filter(Boolean)" /></div>
+        <div style="flex:0 0 60px"><label>On</label><input type="checkbox" ${cdn.enabled?'checked':''} onchange="cdns[${i}].enabled=this.checked" /></div>
+      </div>
+    </div>
+  `).join('');
 }
 
-async function sessionInit() {
+function addCdn() {
+  const n = cdns.length + 1;
+  cdns.push({
+    id: `cdn-${String.fromCharCode(96 + n)}`,
+    name: `CDN ${n}`,
+    base_url: `${location.origin}/test/cdn${String.fromCharCode(96 + n)}/`,
+    regions: [],
+    pricing: { cost_per_gb: 0.05, burst_cost_per_gb: 0.10, currency: 'USD' },
+    weight: 0.3,
+    enabled: true,
+  });
+  renderCdns();
+}
+
+function removeCdn(idx) {
+  cdns.splice(idx, 1);
+  renderCdns();
+}
+
+// ═══ Apply Configuration ═══════════════════════════════════════════════════
+
+async function applyConfig() {
+  const r = await api('/api/sandbox/providers', { method: 'POST', body: cdns });
+  if (r.ok) logEvent('Providers updated', 'ok');
+  return r.ok;
+}
+
+async function initSession() {
+  const proto = $('cfg-proto').value;
+  const cdnIds = cdns.filter(c => c.enabled).map(c => c.id).join(',');
+  const steeringUri = `${location.origin}/api/steer/${proto}`;
   const qs = new URLSearchParams({
-    cdns: $('init-cdns').value,
-    steering_uri: $('init-uri').value,
-    region: $('init-region').value,
-    min_bitrate: $('init-min-br').value,
-    max_bitrate: $('init-max-br').value,
-    duration: $('init-duration').value,
+    cdns: cdnIds,
+    steering_uri: steeringUri,
+    region: $('cfg-region').value,
+    min_bitrate: $('cfg-min-br').value,
+    max_bitrate: $('cfg-max-br').value,
+    duration: $('cfg-duration').value,
   });
   const r = await api(`/api/session/init?${qs}`);
-  show('out-init', r);
-  if (r.ok && r.data.session_state) {
-    // Auto-fill the manifest request JSON
-    $('manifest-req').value = JSON.stringify(r.data, null, 2);
-    $('encode-json').value = JSON.stringify(r.data.session_state, null, 2);
+  if (r.ok) {
+    $('session-state-preview').textContent = JSON.stringify(r.data, null, 2);
+    logEvent('Session initialized', 'ok');
   }
+  return r;
 }
+
+// ═══ Player ════════════════════════════════════════════════════════════════
+
+function destroyPlayer() {
+  if (hlsPlayer) { hlsPlayer.destroy(); hlsPlayer = null; }
+  if (dashPlayer) { dashPlayer.reset(); dashPlayer = null; }
+  if (currentManifestBlob) { URL.revokeObjectURL(currentManifestBlob); currentManifestBlob = null; }
+  $('video').removeAttribute('src');
+  $('video').load();
+}
+
+async function applyAndPlay() {
+  destroyPlayer();
+  $('player-overlay').classList.remove('hidden');
+  $('player-overlay').textContent = 'Configuring...';
+
+  // 1. Apply providers
+  if (!(await applyConfig())) {
+    $('player-overlay').textContent = 'Failed to apply providers';
+    return;
+  }
+
+  // 2. Init session
+  $('player-overlay').textContent = 'Initializing session...';
+  const sessionResult = await initSession();
+  if (!sessionResult.ok) {
+    $('player-overlay').textContent = 'Failed to initialize session';
+    return;
+  }
+
+  const proto = $('cfg-proto').value;
+  const manifestPath = $('cfg-manifest-path').value || (proto === 'hls' ? 'master.m3u8' : 'manifest.mpd');
+  const primaryCdn = cdns.find(c => c.enabled);
+  if (!primaryCdn) {
+    $('player-overlay').textContent = 'No enabled CDNs';
+    return;
+  }
+
+  // 3. Fetch source manifest from primary CDN
+  $('player-overlay').textContent = 'Loading manifest...';
+  const manifestUrl = `${primaryCdn.base_url}/${manifestPath}`;
+  let sourceManifest;
+  try {
+    const resp = await fetch(manifestUrl);
+    if (!resp.ok) {
+      $('player-overlay').textContent = `404: ${manifestPath} not found — check the manifest path and ensure content is in test/ dirs`;
+      return;
+    }
+    sourceManifest = await resp.text();
+  } catch (e) {
+    $('player-overlay').textContent = `Error loading manifest: ${e.message}`;
+    return;
+  }
+
+  // 4. Transform manifest via WASM bridge
+  $('player-overlay').textContent = 'Transforming manifest...';
+  const transformResult = await api('/api/manifest', {
+    method: 'POST',
+    body: { manifest: sourceManifest, request_json: sessionResult.data },
+  });
+  if (!transformResult.ok) {
+    $('player-overlay').textContent = 'Failed to transform manifest';
+    return;
+  }
+
+  const transformedManifest = transformResult.data;
+  $('manifest-preview').textContent = typeof transformedManifest === 'string'
+    ? transformedManifest
+    : JSON.stringify(transformedManifest, null, 2);
+
+  // 5. Create blob URL and start player
+  const mimeType = proto === 'hls' ? 'application/vnd.apple.mpegurl' : 'application/dash+xml';
+  const blob = new Blob([transformedManifest], { type: mimeType });
+  currentManifestBlob = URL.createObjectURL(blob);
+
+  const video = $('video');
+
+  if (proto === 'hls') {
+    if (Hls.isSupported()) {
+      hlsPlayer = new Hls({ debug: false, enableWorker: true });
+
+      hlsPlayer.on(Hls.Events.STEERING_MANIFEST_LOADED, (event, data) => {
+        logSteering(`Steering response: ${JSON.stringify(data)}`, 'ok');
+      });
+      hlsPlayer.on(Hls.Events.ERROR, (event, data) => {
+        logSteering(`HLS error: ${data.type} - ${data.details}`, 'err');
+      });
+      hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+        logSteering('HLS manifest parsed', 'ok');
+        $('player-overlay').classList.add('hidden');
+        video.play().catch(() => {});
+      });
+      hlsPlayer.on(Hls.Events.LEVEL_SWITCHING, (event, data) => {
+        logSteering(`Switching to level ${data.level}`, 'info');
+      });
+
+      hlsPlayer.loadSource(currentManifestBlob);
+      hlsPlayer.attachMedia(video);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Native HLS (Safari)
+      video.src = currentManifestBlob;
+      video.addEventListener('loadedmetadata', () => {
+        $('player-overlay').classList.add('hidden');
+        video.play().catch(() => {});
+      }, { once: true });
+    } else {
+      $('player-overlay').textContent = 'HLS not supported in this browser';
+      return;
+    }
+  } else {
+    // DASH
+    dashPlayer = dashjs.MediaPlayer().create();
+    dashPlayer.updateSettings({
+      debug: { logLevel: dashjs.Debug.LOG_LEVEL_NONE },
+    });
+    dashPlayer.on('error', (e) => {
+      logSteering(`DASH error: ${e.error?.message || JSON.stringify(e)}`, 'err');
+    });
+    dashPlayer.on('playbackStarted', () => {
+      $('player-overlay').classList.add('hidden');
+    });
+    dashPlayer.on('qualityChangeRendered', (e) => {
+      logSteering(`Quality changed: ${e.mediaType} -> ${e.newQuality}`, 'info');
+    });
+    dashPlayer.initialize(video, currentManifestBlob, true);
+  }
+
+  logEvent(`Playing via ${proto.toUpperCase()}`, 'ok');
+}
+
+// ═══ Right Panel: Controls ═════════════════════════════════════════════════
 
 async function setPriorities() {
   const body = {
-    priorities: $('prio-list').value.split(',').map(s => s.trim()).filter(Boolean),
+    priorities: $('ctl-prio').value.split(',').map(s => s.trim()).filter(Boolean),
   };
-  const region = $('prio-region').value.trim();
+  const region = $('ctl-prio-region').value.trim();
   if (region) body.region = region;
-  const ttl = parseInt($('prio-ttl').value);
+  const ttl = parseInt($('ctl-prio-ttl').value);
   if (!isNaN(ttl)) body.ttl_override = ttl;
   const r = await api('/api/priorities', { method: 'POST', body });
   show('out-prio', r);
 }
 
 async function excludePathway() {
-  const body = { pathway: $('excl-pathway').value.trim() };
-  const region = $('excl-region').value.trim();
+  const body = { pathway: $('ctl-excl').value.trim() };
+  const region = $('ctl-excl-region').value.trim();
   if (region) body.region = region;
   const r = await api('/api/exclude', { method: 'POST', body });
-  show('out-prio', r);
+  show('out-excl', r);
 }
 
 async function clearOverrides() {
   const r = await api('/api/clear', { method: 'POST', body: {} });
-  show('out-prio', r);
+  show('out-excl', r);
 }
 
-async function edgeSteer() {
-  const proto = $('steer-proto').value;
-  const qs = new URLSearchParams();
-  const ss = $('steer-ss').value.trim();
-  if (ss) qs.set('_ss', ss);
-  const pw = $('steer-pathway').value.trim();
-  const tp = $('steer-throughput').value.trim();
-  if (proto === 'hls') {
-    if (pw) qs.set('_HLS_pathway', pw);
-    if (tp) qs.set('_HLS_throughput', tp);
-  } else {
-    if (pw) qs.set('_DASH_pathway', pw);
-    if (tp) qs.set('_DASH_throughput', tp);
-  }
-  const r = await api(`/api/steer?${qs}`);
-  show('out-steer', r);
-}
-
-async function loadFixture(type) {
-  const path = type === 'hls' ? '/fixtures/sample-hls.m3u8' : '/fixtures/sample-dash.mpd';
-  const r = await api(path);
-  if (r.ok) $('manifest-src').value = typeof r.data === 'string' ? r.data : JSON.stringify(r.data);
-}
-
-async function updateManifest() {
+async function registerFleet() {
   const body = {
-    manifest: $('manifest-src').value,
-    request_json: $('manifest-req').value,
+    platform: $('fleet-platform').value,
+    control_url: $('fleet-url').value,
+    region: $('fleet-region').value || undefined,
   };
-  const r = await api('/api/manifest', { method: 'POST', body });
-  show('out-manifest', r);
+  const r = await api('/api/fleet/register', { method: 'POST', body });
+  if (r.ok) {
+    logEvent(`Fleet registered: ${r.data.id}`, 'ok');
+    refreshStatus();
+  }
 }
 
-async function getStatus() {
-  const r = await api('/api/status');
-  show('out-status', r);
+async function deregisterFleet(id) {
+  const r = await api(`/api/fleet/${id}`, { method: 'DELETE' });
+  if (r.ok) {
+    logEvent(`Fleet removed: ${id}`, 'ok');
+    refreshStatus();
+  }
+}
+
+async function updateContracts() {
+  let body;
+  try { body = JSON.parse($('ctl-contracts').value); } catch (e) {
+    show('out-contracts', { ok: false, data: `Invalid JSON: ${e.message}` });
+    return;
+  }
+  const r = await api('/api/sandbox/contracts', { method: 'POST', body });
+  show('out-contracts', r);
 }
 
 async function edgeControl() {
   let cmd;
-  try { cmd = JSON.parse($('edge-cmd').value); } catch { cmd = $('edge-cmd').value; }
+  try { cmd = JSON.parse($('ctl-edge-cmd').value); } catch { cmd = $('ctl-edge-cmd').value; }
   const r = await api('/api/edge/control', { method: 'POST', body: cmd });
   show('out-edge', r);
 }
@@ -350,31 +688,89 @@ async function edgeReset() {
 }
 
 async function encodeState() {
-  const r = await api('/api/encode-state', { method: 'POST', body: $('encode-json').value });
-  show('out-encode', r);
-  if (r.ok && r.data.encoded) {
-    $('steer-ss').value = r.data.encoded;
-    $('decode-ss').value = r.data.encoded;
-  }
+  const r = await api('/api/encode-state', { method: 'POST', body: $('enc-json').value });
+  show('out-enc', r);
+  if (r.ok && r.data.encoded) $('enc-ss').value = r.data.encoded;
 }
 
 function decodeState() {
-  const ss = $('decode-ss').value.trim();
+  const ss = $('enc-ss').value.trim();
   if (!ss) return;
   try {
     const padded = ss + '='.repeat((4 - (ss.length % 4)) % 4);
     const decoded = JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')));
-    $('out-encode').className = 'result';
-    $('out-encode').textContent = JSON.stringify(decoded, null, 2);
-    $('encode-json').value = JSON.stringify(decoded, null, 2);
+    $('out-enc').className = 'ok';
+    $('out-enc').textContent = JSON.stringify(decoded, null, 2);
+    $('enc-json').value = JSON.stringify(decoded, null, 2);
   } catch (e) {
-    $('out-encode').className = 'error';
-    $('out-encode').textContent = `Decode error: ${e.message}`;
+    $('out-enc').className = 'err';
+    $('out-enc').textContent = `Decode error: ${e.message}`;
   }
 }
 
-// Auto-check health on load
+// ═══ Health & Status ═══════════════════════════════════════════════════════
+
+async function checkHealth() {
+  try {
+    const resp = await fetch(`${API}/api/health`);
+    const data = await resp.json();
+    $('dot-main').className = data.main_steering ? 'dot up' : 'dot down';
+    $('dot-edge').className = data.edge_steering ? 'dot up' : 'dot down';
+  } catch {
+    $('dot-main').className = 'dot down';
+    $('dot-edge').className = 'dot down';
+  }
+}
+
+async function refreshStatus() {
+  try {
+    const resp = await fetch(`${API}/api/status`);
+    const data = await resp.json();
+    $('gen-display').textContent = `gen: ${data.generation}`;
+    $('out-status').className = 'ok';
+    $('out-status').textContent = JSON.stringify(data, null, 2);
+
+    // Render fleet list
+    const fleet = data.fleet || [];
+    $('fleet-list').innerHTML = fleet.length === 0
+      ? '<span style="color:var(--muted);font-size:10px">No fleet instances</span>'
+      : fleet.map(f => `
+        <div class="fleet-row">
+          <span>${escHtml(f.platform)} / ${escHtml(f.region || 'global')}</span>
+          <span>
+            <span class="dot ${f.healthy ? 'up' : 'down'}"></span>
+            <button class="btn-s btn-danger" onclick="deregisterFleet('${escHtml(f.id)}')" style="margin-left:4px">&times;</button>
+          </span>
+        </div>
+      `).join('');
+  } catch {
+    $('out-status').className = 'err';
+    $('out-status').textContent = 'Failed to fetch status';
+  }
+}
+
+// ═══ Init ══════════════════════════════════════════════════════════════════
+
+renderCdns();
 checkHealth();
+refreshStatus();
+
+// Auto-refresh
+setInterval(() => {
+  if ($('auto-refresh').checked) {
+    refreshStatus();
+    checkHealth();
+  }
+}, 5000);
+
+// Update manifest path when protocol changes
+$('cfg-proto').addEventListener('change', () => {
+  const proto = $('cfg-proto').value;
+  const current = $('cfg-manifest-path').value;
+  if (current === 'master.m3u8' || current === 'manifest.mpd') {
+    $('cfg-manifest-path').value = proto === 'hls' ? 'master.m3u8' : 'manifest.mpd';
+  }
+});
 </script>
 </body>
 </html>
