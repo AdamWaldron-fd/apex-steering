@@ -150,9 +150,5 @@ Each module has dedicated tests covering happy paths, edge cases, and boundary c
   - SessionState field validation against edge Rust expectations
   - Propagation result structure verification
 
-### E2E Tests (60 tests)
-Shell script (`scripts/test-e2e.sh`) that starts the real server and exercises all endpoints via curl:
-- Health check, session init (with/without optional params, region, override_gen tracking)
-- Fleet registration for all 4 platforms, deregistration, invalid platform rejection
-- Control commands (priorities, exclude, clear) with generation counter validation
-- Region-scoped commands, status endpoints, validation errors
+### E2E Tests
+Cross-system E2E tests are in `e2e/src/tests/` (vitest). See root `README.md` for details.

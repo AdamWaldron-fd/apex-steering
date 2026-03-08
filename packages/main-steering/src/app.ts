@@ -1,9 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { AppState } from "./state.js";
 import { CdnRegistry, type CdnProvider } from "./cdn.js";
@@ -252,20 +249,6 @@ export function createApp(state: AppState): Hono {
       body.usage ?? [],
     );
     return c.json({ status: "ok", count: body.contracts.length });
-  });
-
-  // ── Dev UI ──────────────────────────────────────────────────────────────
-
-  app.get("/ui", (c) => {
-    try {
-      // Resolve relative to this source file — works from both src/ and dist/
-      const thisDir = dirname(fileURLToPath(import.meta.url));
-      const uiPath = resolve(thisDir, "..", "scripts", "ui.html");
-      const html = readFileSync(uiPath, "utf-8");
-      return c.html(html);
-    } catch {
-      return c.text("UI file not found. Run from project root.", 404);
-    }
   });
 
   return app;

@@ -2,6 +2,12 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+echo ""
+echo "  apex-steering dev"
+echo "  ─────────────────"
+echo "  Starting services..."
+echo ""
+
 # Start main-steering
 cd "$ROOT/packages/main-steering"
 npx tsx src/server.ts --port 4444 &
@@ -25,10 +31,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Wait for servers to start
+sleep 2
+
 echo ""
-echo "  Main steering:  http://localhost:4444"
-echo "  Edge steering:  http://localhost:3077"
-echo "  Sandbox:        http://localhost:5555"
+echo "  ✓ All services running"
+echo ""
+echo "  ┌──────────────────────────────────────────────┐"
+echo "  │                                              │"
+echo "  │   Open http://localhost:5555                 │"
+echo "  │                                              │"
+echo "  └──────────────────────────────────────────────┘"
+echo ""
+echo "  Services:"
+echo "    main-steering  :4444  (control plane)"
+echo "    edge-steering  :3077  (edge / data plane)"
+echo "    sandbox        :5555  (dashboard + proxy)"
 echo ""
 echo "  Press Ctrl+C to stop all services."
 wait

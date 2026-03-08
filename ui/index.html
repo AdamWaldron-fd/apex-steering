@@ -154,7 +154,6 @@
 
     <div class="btn-row">
       <button class="btn-green" onclick="applyAndPlay()" style="flex:1">Apply &amp; Play</button>
-      <button class="btn-secondary" onclick="applyConfig()">Apply Only</button>
     </div>
 
   </div>
@@ -185,14 +184,6 @@
       <div class="section-title" onclick="toggleSection(this)">Session State <span class="toggle">[+]</span></div>
       <div class="section-body collapsed">
         <pre id="session-state-preview" class="ok"></pre>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Event Log <span class="toggle">[+]</span></div>
-      <div class="section-body collapsed">
-        <div class="event-log" id="event-log"></div>
-        <div class="btn-row"><button class="btn-s btn-secondary" onclick="document.getElementById('event-log').innerHTML=''">Clear</button></div>
       </div>
     </div>
 
@@ -284,40 +275,6 @@
 
     <hr>
 
-    <!-- Edge Control -->
-    <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Edge Control <span class="toggle">[+]</span></div>
-      <div class="section-body collapsed">
-        <label>Command JSON</label>
-        <textarea id="ctl-edge-cmd" rows="2">{"type":"set_priorities","region":null,"priorities":["cdn-b","cdn-a","cdn-c"],"generation":1,"ttl_override":null}</textarea>
-        <div class="btn-row">
-          <button class="btn-s" onclick="edgeControl()">Send</button>
-          <button class="btn-s btn-danger" onclick="edgeReset()">Reset Edge</button>
-        </div>
-        <pre id="out-edge" class="ok" style="margin-top:6px;max-height:80px"></pre>
-      </div>
-    </div>
-
-    <hr>
-
-    <!-- Encode/Decode -->
-    <div class="section">
-      <div class="section-title" onclick="toggleSection(this)">Encode / Decode State <span class="toggle">[+]</span></div>
-      <div class="section-body collapsed">
-        <label>Session State JSON</label>
-        <textarea id="enc-json" rows="3"></textarea>
-        <div class="btn-row">
-          <button class="btn-s" onclick="encodeState()">Encode</button>
-          <button class="btn-s btn-secondary" onclick="decodeState()">Decode</button>
-        </div>
-        <label>_ss value</label>
-        <input id="enc-ss" value="" placeholder="base64url" />
-        <pre id="out-enc" class="ok" style="margin-top:6px;max-height:80px"></pre>
-      </div>
-    </div>
-
-    <hr>
-
     <!-- Status -->
     <div class="section">
       <div class="section-title" onclick="toggleSection(this)">System Status <span class="toggle">[-]</span></div>
@@ -372,9 +329,7 @@ function escHtml(s) {
 }
 
 function logEvent(msg, type = 'info') {
-  const el = $('event-log');
-  const ts = new Date().toLocaleTimeString();
-  el.innerHTML = `<div class="ev"><span class="ev-time">[${ts}]</span> <span class="ev-${type}">${escHtml(msg)}</span></div>` + el.innerHTML;
+  logSteering(msg, type);
 }
 
 function logSteering(msg, type = 'info') {
@@ -527,7 +482,8 @@ async function applyAndPlay() {
 
   // 3. Fetch source manifest from primary CDN
   $('player-overlay').textContent = 'Loading manifest...';
-  const manifestUrl = `${primaryCdn.base_url}/${manifestPath}`;
+  const base = primaryCdn.base_url.replace(/\/+$/, '');
+  const manifestUrl = `${base}/${manifestPath}`;
   let sourceManifest;
   try {
     const resp = await fetch(manifestUrl);
@@ -680,38 +636,6 @@ async function updateContracts() {
   show('out-contracts', r);
 }
 
-async function edgeControl() {
-  let cmd;
-  try { cmd = JSON.parse($('ctl-edge-cmd').value); } catch { cmd = $('ctl-edge-cmd').value; }
-  const r = await api('/api/edge/control', { method: 'POST', body: cmd });
-  show('out-edge', r);
-}
-
-async function edgeReset() {
-  const r = await api('/api/edge/reset', { method: 'POST', body: {} });
-  show('out-edge', r);
-}
-
-async function encodeState() {
-  const r = await api('/api/encode-state', { method: 'POST', body: $('enc-json').value });
-  show('out-enc', r);
-  if (r.ok && r.data.encoded) $('enc-ss').value = r.data.encoded;
-}
-
-function decodeState() {
-  const ss = $('enc-ss').value.trim();
-  if (!ss) return;
-  try {
-    const padded = ss + '='.repeat((4 - (ss.length % 4)) % 4);
-    const decoded = JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')));
-    $('out-enc').className = 'ok';
-    $('out-enc').textContent = JSON.stringify(decoded, null, 2);
-    $('enc-json').value = JSON.stringify(decoded, null, 2);
-  } catch (e) {
-    $('out-enc').className = 'err';
-    $('out-enc').textContent = `Decode error: ${e.message}`;
-  }
-}
 
 // ═══ Health & Status ═══════════════════════════════════════════════════════
 

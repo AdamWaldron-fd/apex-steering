@@ -280,8 +280,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\napex-steering sandbox: http://localhost:${PORT}`);
-  console.log(`  Main steering: ${MAIN_URL}`);
-  console.log(`  Edge steering: ${EDGE_URL}`);
-  console.log(`  Test content:  /test/cdna/, /test/cdnb/, /test/cdnc/\n`);
+  console.log(`  sandbox ready on :${PORT}`);
 });

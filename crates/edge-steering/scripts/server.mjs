@@ -79,12 +79,6 @@ function respond(res, status, body, extraHeaders = {}) {
 }
 
 async function createHandler(wasm) {
-  // Load dev UI HTML once at startup.
-  let uiHtml = '';
-  try {
-    uiHtml = await readFile(join(__dirname, 'ui.html'), 'utf8');
-  } catch { /* no UI file — skip */ }
-
   return async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const path = url.pathname;
@@ -98,12 +92,6 @@ async function createHandler(wasm) {
         'Access-Control-Allow-Headers': 'Content-Type',
       });
       return res.end();
-    }
-
-    // Dev UI
-    if (path === '/' && uiHtml) {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      return res.end(uiHtml);
     }
 
     // Health check
@@ -184,9 +172,8 @@ async function createHandler(wasm) {
 
 const PORT = parseInt(process.argv.find((_, i, a) => a[i - 1] === '--port') || '3001', 10);
 
-console.log('Loading WASM module...');
+console.log('  Loading edge-steering WASM...');
 const wasm = await loadWasm();
-console.log('WASM loaded successfully.');
 
 const handler = await createHandler(wasm);
 const server = createServer((req, res) => handler(req, res).catch((err) => {
@@ -195,14 +182,5 @@ const server = createServer((req, res) => handler(req, res).catch((err) => {
 }));
 
 server.listen(PORT, () => {
-  console.log(`\napex-edge-steering dev server listening on http://localhost:${PORT}`);
-  console.log(`\nEndpoints:`);
-  console.log(`  GET  /                       Dev UI`);
-  console.log(`  GET  /steer[/hls|/dash]?...  Steering requests`);
-  console.log(`  POST /control                Master control commands`);
-  console.log(`  GET  /health                 Health check`);
-  console.log(`  POST /config                 Update policy config`);
-  console.log(`  POST /encode-state           Encode initial session state`);
-  console.log(`  POST /reset                  Reset overrides and config`);
-  console.log(`\n  Dev UI: http://localhost:${PORT}/\n`);
+  console.log(`  edge-steering ready on :${PORT}`);
 });

@@ -1,5 +1,8 @@
 # Test Content for Local CDN Simulation
-
+Create 3 subdirectories in /test `cdna`, `cdnb`, and `cdnc`.
+```bash
+mkdir cdn{a,b,c}
+```
 Each subdirectory (`cdna/`, `cdnb/`, `cdnc/`) acts as a separate fake CDN origin.
 Place identical CMAF-packaged content in each directory so the steering system
 can switch between them.

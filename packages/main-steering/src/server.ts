@@ -44,18 +44,5 @@ const state = new AppState(
 const app = createApp(state);
 
 serve({ fetch: app.fetch, port: PORT }, (info) => {
-  console.log(`\napex-main-steering listening on http://localhost:${info.port}`);
-  console.log(`\nEndpoints:`);
-  console.log(`  GET  /health             Health check`);
-  console.log(`  GET  /session/init       Generate session state for manifest updaters`);
-  console.log(`  POST /priorities         Force CDN priority order → propagate to edge fleet`);
-  console.log(`  POST /exclude            Exclude a CDN pathway → propagate to edge fleet`);
-  console.log(`  POST /clear              Clear all overrides → propagate to edge fleet`);
-  console.log(`  POST /fleet/register     Register an edge instance`);
-  console.log(`  DELETE /fleet/:id        Remove an edge instance`);
-  console.log(`  GET  /status             Full system state`);
-  console.log(`  GET  /status/contracts   Contract usage summary`);
-  console.log(`  GET  /ui                Dev UI`);
-  console.log(`\nDev UI: http://localhost:${info.port}/ui`);
-  console.log();
+  console.log(`  main-steering ready on :${info.port}`);
 });
