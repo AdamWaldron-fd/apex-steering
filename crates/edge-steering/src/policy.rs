@@ -57,17 +57,30 @@ pub fn evaluate(
         }
     }
 
-    // Remove excluded pathways.
+    // Remove excluded pathways, tracking whether the list actually changed.
+    let pre_exclude_len = priorities.len();
     if !overrides.excluded_pathways.is_empty() {
         priorities.retain(|p| !overrides.excluded_pathways.contains(p));
     }
 
+    // Ensure we have at least one pathway.
+    if priorities.is_empty() {
+        priorities = state.priorities.clone();
+    }
+
+    // Exclusion is "active" only if it actually reduced the list (and the
+    // fallback didn't restore it — i.e., not all pathways were excluded).
+    let exclusion_active = priorities.len() < pre_exclude_len;
+
     // Determine TTL.
+    // If a priority override has an explicit TTL, use it. Otherwise, if an
+    // exclusion actually removed pathways, use the short QoE TTL so the player
+    // picks up the change quickly instead of waiting the full default interval.
     let mut ttl = overrides
         .priority_override
         .as_ref()
         .and_then(|ov| ov.ttl_override)
-        .unwrap_or(config.default_ttl);
+        .unwrap_or(if exclusion_active { config.qoe_ttl } else { config.default_ttl });
 
     // QoE optimization: if the client reports low throughput on the current
     // pathway, promote the next pathway and reduce TTL for faster re-evaluation.
@@ -89,11 +102,6 @@ pub fn evaluate(
                 }
             }
         }
-    }
-
-    // Ensure we have at least one pathway.
-    if priorities.is_empty() {
-        priorities = state.priorities.clone();
     }
 
     SteeringResponse::new(protocol, priorities, ttl)
@@ -356,6 +364,8 @@ mod tests {
             resp.pathway_priority,
             Some(vec!["alpha".into(), "gamma".into()])
         );
+        // Exclusion active → short TTL for fast player pickup
+        assert_eq!(resp.ttl, QOE_TTL);
     }
 
     #[test]
@@ -374,6 +384,7 @@ mod tests {
             &PolicyConfig::default(),
         );
         assert_eq!(resp.pathway_priority, Some(vec!["beta".into()]));
+        assert_eq!(resp.ttl, QOE_TTL);
     }
 
     #[test]
@@ -391,11 +402,12 @@ mod tests {
             &overrides,
             &PolicyConfig::default(),
         );
-        // All excluded → fallback to original state priorities
+        // All excluded → fallback to original state priorities, default TTL
         assert_eq!(
             resp.pathway_priority,
             Some(vec!["alpha".into(), "beta".into(), "gamma".into()])
         );
+        assert_eq!(resp.ttl, DEFAULT_TTL);
     }
 
     #[test]
@@ -417,6 +429,8 @@ mod tests {
             resp.pathway_priority,
             Some(vec!["alpha".into(), "beta".into(), "gamma".into()])
         );
+        // Non-existent exclusion didn't change anything → default TTL
+        assert_eq!(resp.ttl, DEFAULT_TTL);
     }
 
     #[test]
@@ -444,6 +458,36 @@ mod tests {
             resp.pathway_priority,
             Some(vec!["gamma".into(), "alpha".into()])
         );
+        // Exclusion active + no explicit TTL override → short TTL
+        assert_eq!(resp.ttl, QOE_TTL);
+    }
+
+    #[test]
+    fn exclude_with_explicit_ttl_override_uses_override() {
+        let state = make_state();
+        let overrides = OverrideState {
+            priority_override: Some(PriorityOverride {
+                priorities: vec!["alpha".into(), "beta".into(), "gamma".into()],
+                generation: 1,
+                ttl_override: Some(60),
+            }),
+            excluded_pathways: vec!["beta".into()],
+            generation: 2,
+        };
+        let resp = evaluate(
+            Protocol::Hls,
+            &state,
+            None,
+            None,
+            &overrides,
+            &PolicyConfig::default(),
+        );
+        assert_eq!(
+            resp.pathway_priority,
+            Some(vec!["alpha".into(), "gamma".into()])
+        );
+        // Explicit TTL override takes precedence over exclusion short TTL
+        assert_eq!(resp.ttl, 60);
     }
 
     // ─── QoE optimization tests ─────────────────────────────────────────
