@@ -122,6 +122,23 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Static: UI assets (JS, CSS modules) ─────────────────────
+    if (url.pathname.startsWith("/ui/")) {
+      const safePath = path.normalize(url.pathname).replace(/^\/+/, "");
+      const filePath = path.join(PROJECT_ROOT, safePath);
+      if (!filePath.startsWith(path.join(PROJECT_ROOT, "ui"))) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "forbidden" }));
+        return;
+      }
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        const content = fs.readFileSync(filePath);
+        res.writeHead(200, { "Content-Type": mimeType(filePath) });
+        res.end(content);
+        return;
+      }
+    }
+
     // ── Static: Test content (fake CDN origins) ──────────────────
     if (url.pathname.startsWith("/test/")) {
       const safePath = path.normalize(url.pathname).replace(/^\/+/, "");
